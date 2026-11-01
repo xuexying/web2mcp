@@ -7,7 +7,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent, ToolAnnotations
 from .client import Client, CallError
 from .contracts import install_contract
-from .explore import explore_round, propose, source_map, synthesize_profile
+from .explore import explore_round, propose, source_map, synthesize_profile, auto_publish_reads
 from .runtime import trial_read, publish_reads
 from .storage import load_json
 from .packs import draft_pack, trial_pack, install_pack
@@ -23,6 +23,8 @@ def definitions():
       ('explorer_source_map','Statically map the API surface from the app\'s shipped JavaScript (endpoints, methods, read/write). Downloads JS; never executes it. Best-effort, pairs with survey.',True,empty),
       ('explorer_synthesize','Auto-build a serveable profile from the source map: real API endpoints become manifest ops (reads trial-ready, writes preview-only), reusing an established credential. Run after source_map.',False,
         schema({'api_origin':{'type':'string'}},[])),
+      ('explorer_auto_publish','Auto-trial every read op in the synthesized profile and publish the ones that return data. Installs working read tools with no per-tool step; writes untouched.',False,
+        schema({'profile':{'type':'string'}},[])),
       ('explorer_act','Execute reviewed UI actions within the goal and budget. May change product state; never blindly repeat.',False,
         schema({'label':{'type':'string'},'steps':{'type':'array','minItems':1,'maxItems':8,'items':{'type':'object'}},'wait_selector':{'type':'string'}},['label','steps'])),
       ('explorer_handoff','Hand browser control to the user for login.',False,empty),
@@ -52,6 +54,7 @@ def execute(directory,name,arguments):
     if name=='explorer_revise_policy':return propose(root,arguments['policy'],revision=True)
     if name=='explorer_source_map':return source_map(root)
     if name=='explorer_synthesize':return synthesize_profile(root,api_origin=arguments.get('api_origin'))
+    if name=='explorer_auto_publish':return auto_publish_reads(root,profile=arguments.get('profile','synth'))
     kinds={'explorer_observe':'observe','explorer_survey':'survey','explorer_act':'actions','explorer_handoff':'handoff','explorer_resume':'resume','explorer_finish':'finish'}
     if name in kinds:return explore_round(root,{'kind':kinds[name],**arguments})
     state=load_json(root/'session.json')

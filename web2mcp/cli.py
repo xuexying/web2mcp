@@ -35,6 +35,8 @@ def main():
     e.add_argument('directory')
     e = commands.add_parser('synth-profile', help='Auto-build a serveable profile from the source map (reads trial-ready, writes preview)')
     e.add_argument('directory');e.add_argument('--api-origin')
+    e = commands.add_parser('auto-publish', help='Auto-trial every read op and publish the ones that return data')
+    e.add_argument('directory');e.add_argument('--profile',default='synth')
     e = commands.add_parser('explore-propose', help='Generate candidate policy, tool cards and draft profile')
     e.add_argument('directory');e.add_argument('--policy');e.add_argument('--revision',action='store_true')
     e = commands.add_parser('serve-explorer', help='Expose goal-driven CU exploration tools to a connected AI')
@@ -63,7 +65,7 @@ def main():
         from .explorer_server import serve
         serve(args.directory)
         return
-    elif args.command.startswith('explore-') or args.command in ('source-map','synth-profile'):
+    elif args.command.startswith('explore-') or args.command in ('source-map','synth-profile','auto-publish'):
         from .explore import start_session, explore_round, propose
         if args.command=='explore-start': result=start_session(args.directory,args.url,args.goal,args.origin,args.budget,
             load_json(args.storage_sources) if args.storage_sources else None)
@@ -75,6 +77,9 @@ def main():
         elif args.command=='synth-profile':
             from .explore import synthesize_profile
             result=synthesize_profile(args.directory,api_origin=args.api_origin)
+        elif args.command=='auto-publish':
+            from .explore import auto_publish_reads
+            result=auto_publish_reads(args.directory,profile=args.profile)
         else: result=propose(args.directory,load_json(args.policy) if args.policy else None,revision=args.revision)
     elif args.command=='refresh-login':
         from .runtime import refresh_credentials

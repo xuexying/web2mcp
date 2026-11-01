@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "web2mcp-local"
 version = "0.4.0"
-authors = [{ name = "xuexying" }]
+authors = [{ name = "xueying" }]
 readme = "README.md"
 description = "Observed browser requests to local Python clients and MCP tools"
 requires-python = ">=3.11"

@@ -1,6 +1,6 @@
 # Web2MCP
 
-**第一作者 / First author: xuexying**
+**第一作者 / First author: xueying**
 
 **让 AI 从浏览器里的实际操作中学习接口，把验证过的操作转成可复用的 Python 调用与 MCP 工具。**
 

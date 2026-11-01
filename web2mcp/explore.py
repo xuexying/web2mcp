@@ -190,17 +190,22 @@ def synthesize_profile(directory, *, api_origin=None):
                       else next((o for o in origins if o != start_origin), origins[0] if origins else None))
     if not api_origin:
         raise CallError('Cannot determine API origin; pass api_origin')
-    # Reuse an established credential_ref (nd_mac/cookie/etc.) from a prior draft if present.
+    # Reuse an established credential from a prior draft if present — the FULL context for that
+    # ref: auth (nd_mac/cookie/…), the captured headers (tenantid, referer, origin, user-agent…
+    # that the server may require beyond the token) and cookies. Missing headers often surface as
+    # a 401 even when the token is valid, so copy them, not just the auth record.
     cred_ref = 'default'
-    creds = {'auth': {}}
+    creds = {'auth': {cred_ref: {'type': 'unsupported'}}}  # placeholder; user establishes auth
     draft_creds = root/'draft'/'credentials.json'
     if draft_creds.exists():
         dc = load_json(draft_creds)
         if dc.get('auth'):
             cred_ref = sorted(dc['auth'])[0]
             creds = {'auth': {cred_ref: dc['auth'][cred_ref]}}
-    if not creds['auth']:
-        creds = {'auth': {cred_ref: {'type': 'unsupported'}}}  # user must establish auth
+            if dc.get('headers', {}).get(cred_ref):
+                creds['headers'] = {cred_ref: dc['headers'][cred_ref]}
+            if dc.get('cookies'):
+                creds['cookies'] = dc['cookies']
     taken, ops, n_read, n_write, n_captured = set(), [], 0, 0, 0
     for e in amap.get('endpoints', []):
         path = e['path']
@@ -214,8 +219,10 @@ def synthesize_profile(directory, *, api_origin=None):
               'body': None, 'body_type': 'json', 'credential_ref': cred_ref, 'read_only': read_only,
               'description': f"{e['method']} {path} (synthesized from source; "
                              + ("captured at runtime" if path.rstrip('/') in captured_paths else "static only, trial before trusting") + ")",
-              'input_schema': {'type': 'object', 'properties': (
-                  {'query': {'type': 'object'}} if read_only else {'body': {'type': 'object'}})},
+              # Reads: open schema (no declared params) so a single-case auto-trial applies and
+              # callers may still pass query/path at call time. Writes: require a body object.
+              'input_schema': ({'type': 'object'} if read_only else
+                               {'type': 'object', 'properties': {'body': {'type': 'object'}}, 'required': ['body']}),
               'synthesized': True, 'captured': path.rstrip('/') in captured_paths}
         ops.append(op)
         n_read += read_only; n_write += (not read_only); n_captured += op['captured']
@@ -226,6 +233,39 @@ def synthesize_profile(directory, *, api_origin=None):
     return {'profile': str(out), 'api_origin': api_origin, 'operations': len(ops),
             'read': n_read, 'write': n_write, 'captured': n_captured, 'credential_ref': cred_ref,
             'next': 'trial-read the reads then publish; writes stay preview until you authorize.'}
+
+
+def auto_publish_reads(directory, *, profile='synth'):
+    """Auto-trial every read op in a profile and publish the ones that return business data.
+    Closes the read loop: after synth-profile, this installs the working read tools with no
+    per-tool human step. Non-param reads trial with a single case asserting the response carries
+    data; ops needing a specific parameter (e.g. a detail id) fail the trial and are left out,
+    not published. Writes are never touched. Needs the profile's credentials to be established."""
+    from .client import Client
+    from .runtime import trial_read, publish_reads
+    root = Path(directory).resolve()
+    prof = root/profile if (root/profile).exists() else root
+    manifest = load_json(prof/'manifest.json')
+    reads = [o['name'] for o in manifest['operations'] if o.get('read_only') and not o.get('internal')]
+    passed, failed = [], []
+    with Client(prof) as client:
+        for name in reads:
+            try:
+                trial_read(client, name, [{'arguments': {},
+                    'assertions': [{'pointer': '/data', 'op': 'exists', 'value': True}]}],
+                    reviewed_read_only=True)
+                passed.append(name)
+            except Exception as e:
+                failed.append({'name': name, 'reason': f'{type(e).__name__}: {str(e)[:70]}'})
+        published = []
+        if passed:
+            try:
+                published = publish_reads(client, passed).get('published') or passed
+            except Exception as e:
+                failed.append({'name': 'publish', 'reason': f'{type(e).__name__}: {str(e)[:70]}'})
+    return {'profile': str(prof), 'read_ops': len(reads), 'passed': len(passed),
+            'published': published, 'failed': failed[:25],
+            'next': 'reconnect the MCP server; published read tools are live. Writes still need authorization.'}
 
 
 def propose(directory, policy=None, *, revision=False):
