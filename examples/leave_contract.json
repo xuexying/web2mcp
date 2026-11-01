@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "name": "leave_approve",
+  "description": "Approve fixture leave",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1
+      },
+      "cover_person": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "id",
+      "note",
+      "cover_person"
+    ],
+    "additionalProperties": false
+  },
+  "lock_key": {
+    "$arg": "/id"
+  },
+  "preflight": [
+    {
+      "id": "before",
+      "operation": "detail",
+      "arguments": {
+        "path": {
+          "record_id": {
+            "$arg": "/id"
+          }
+        }
+      },
+      "pin": [
+        "/data/id",
+        "/data/version",
+        "/data/status",
+        "/data/kind"
+      ],
+      "assertions": [
+        {
+          "pointer": "/data/id",
+          "value": {
+            "$arg": "/id"
+          }
+        },
+        {
+          "pointer": "/data/kind",
+          "value": "leave"
+        },
+        {
+          "pointer": "/data/status",
+          "value": "pending"
+        }
+      ]
+    }
+  ],
+  "write": {
+    "operation": "decide",
+    "allowed_body_fields": [
+      "version",
+      "decision",
+      "note",
+      "cover_person"
+    ],
+    "arguments": {
+      "path": {
+        "record_id": {
+          "$arg": "/id"
+        }
+      },
+      "body": {
+        "version": {
+          "$step": "before",
+          "pointer": "/data/version"
+        },
+        "decision": "approved",
+        "note": {
+          "$arg": "/note"
+        },
+        "cover_person": {
+          "$arg": "/cover_person"
+        }
+      }
+    }
+  },
+  "verify": [
+    {
+      "id": "after",
+      "operation": "detail",
+      "arguments": {
+        "path": {
+          "record_id": {
+            "$arg": "/id"
+          }
+        }
+      },
+      "assertions": [
+        {
+          "pointer": "/data/id",
+          "value": {
+            "$arg": "/id"
+          }
+        },
+        {
+          "pointer": "/data/status",
+          "value": "approved"
+        },
+        {
+          "pointer": "/data/version",
+          "op": "gt",
+          "value": {
+            "$step": "before",
+            "pointer": "/data/version"
+          }
+        },
+        {
+          "pointer": "/data/note",
+          "value": {
+            "$arg": "/note"
+          }
+        },
+        {
+          "pointer": "/data/cover_person",
+          "value": {
+            "$arg": "/cover_person"
+          }
+        }
+      ]
+    }
+  ]
+}

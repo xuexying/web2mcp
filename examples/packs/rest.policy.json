@@ -1,0 +1,10 @@
+{
+  "GET /rest/tickets/{ticket_id}": {
+    "name": "detail",
+    "read_only": true
+  },
+  "POST /rest/tickets/{ticket_id}/decision": {
+    "name": "decide",
+    "read_only": false
+  }
+}

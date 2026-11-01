@@ -1,0 +1,13 @@
+{
+  "GET /api/records": {
+    "name": "search_records",
+    "description": "按实际捕获的查询参数搜索记录",
+    "read_only": true
+  },
+  "POST /api/approve": {
+    "name": "approve_record",
+    "description": "审批写入；默认预览，执行前必须确认业务内容",
+    "read_only": false
+  },
+  "POST /api/analytics": {"exclude": true}
+}

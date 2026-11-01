@@ -1,0 +1,379 @@
+{
+  "version": 1,
+  "name": "form_demo",
+  "description": "Isolated form integration fixture",
+  "bindings": {
+    "detail": "detail",
+    "decide": "decide"
+  },
+  "reads": [
+    {
+      "name": "read",
+      "description": "Read and normalize a record; compute total from rows.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "steps": [
+        {
+          "id": "before",
+          "operation": "detail",
+          "arguments": {
+            "query": {
+              "id": {
+                "$arg": "/id"
+              }
+            }
+          },
+          "assertions": [
+            {
+              "pointer": "/data/document/fields/documentId",
+              "op": "eq",
+              "value": {
+                "$arg": "/id"
+              }
+            }
+          ]
+        }
+      ],
+      "output": {
+        "id": {
+          "$step": "before",
+          "pointer": "/data/document/fields/documentId"
+        },
+        "status": {
+          "$step": "before",
+          "pointer": "/data/document/fields/state"
+        },
+        "total": {
+          "$fn": "sum",
+          "args": [
+            {
+              "$map": {
+                "$step": "before",
+                "pointer": "/data/document/fields/rows"
+              },
+              "value": {
+                "$fn": "multiply",
+                "args": [
+                  {
+                    "$item": "/quantity"
+                  },
+                  {
+                    "$item": "/price"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "total"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "contracts": [
+    {
+      "version": 1,
+      "name": "approve",
+      "description": "Approve an isolated test record with calculated fields.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "note": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        },
+        "required": [
+          "id",
+          "note",
+          "start"
+        ],
+        "additionalProperties": false
+      },
+      "preflight": [
+        {
+          "id": "before",
+          "operation": "detail",
+          "arguments": {
+            "query": {
+              "id": {
+                "$arg": "/id"
+              }
+            }
+          },
+          "assertions": [
+            {
+              "pointer": "/data/document/fields/documentId",
+              "op": "eq",
+              "value": {
+                "$arg": "/id"
+              }
+            },
+            {
+              "pointer": "/data/document/fields/state",
+              "op": "eq",
+              "value": "pending"
+            }
+          ],
+          "pin": [
+            "/data/document/fields"
+          ]
+        }
+      ],
+      "write": {
+        "operation": "decide",
+        "arguments": {
+          "body": {
+            "documentId": {
+              "$arg": "/id"
+            },
+            "payload": {
+              "$fn": "json",
+              "args": [
+                {
+                  "decision": "approved",
+                  "note": {
+                    "$arg": "/note"
+                  },
+                  "due": {
+                    "$fn": "date_add_days",
+                    "args": [
+                      {
+                        "$arg": "/start"
+                      },
+                      30
+                    ]
+                  },
+                  "total": {
+                    "$fn": "sum",
+                    "args": [
+                      {
+                        "$map": {
+                          "$step": "before",
+                          "pointer": "/data/document/fields/rows"
+                        },
+                        "value": {
+                          "$fn": "multiply",
+                          "args": [
+                            {
+                              "$item": "/quantity"
+                            },
+                            {
+                              "$item": "/price"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "version": {
+                    "$step": "before",
+                    "pointer": "/data/document/fields/revision"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "allowed_body_fields": [
+          "documentId",
+          "payload"
+        ]
+      },
+      "verify": [
+        {
+          "id": "after",
+          "operation": "detail",
+          "arguments": {
+            "query": {
+              "id": {
+                "$arg": "/id"
+              }
+            }
+          },
+          "assertions": [
+            {
+              "pointer": "/data/document/fields/documentId",
+              "op": "eq",
+              "value": {
+                "$arg": "/id"
+              }
+            },
+            {
+              "pointer": "/data/document/fields/state",
+              "op": "eq",
+              "value": "approved"
+            },
+            {
+              "pointer": "/data/document/fields/note",
+              "op": "eq",
+              "value": {
+                "$arg": "/note"
+              }
+            },
+            {
+              "pointer": "/data/document/fields/due",
+              "op": "eq",
+              "value": {
+                "$fn": "date_add_days",
+                "args": [
+                  {
+                    "$arg": "/start"
+                  },
+                  30
+                ]
+              }
+            },
+            {
+              "pointer": "/data/document/fields/total",
+              "op": "eq",
+              "value": {
+                "$fn": "sum",
+                "args": [
+                  {
+                    "$map": {
+                      "$step": "before",
+                      "pointer": "/data/document/fields/rows"
+                    },
+                    "value": {
+                      "$fn": "multiply",
+                      "args": [
+                        {
+                          "$item": "/quantity"
+                        },
+                        {
+                          "$item": "/price"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "pointer": "/data/document/fields/revision",
+              "op": "gt",
+              "value": {
+                "$step": "before",
+                "pointer": "/data/document/fields/revision"
+              }
+            }
+          ]
+        }
+      ],
+      "lock_key": {
+        "$arg": "/id"
+      }
+    }
+  ],
+  "trials": {
+    "read": [
+      {
+        "arguments": {
+          "id": "101"
+        },
+        "assertions": [
+          {
+            "pointer": "/id",
+            "op": "eq",
+            "value": "101"
+          },
+          {
+            "pointer": "/total",
+            "op": "eq",
+            "value": 25
+          }
+        ]
+      },
+      {
+        "arguments": {
+          "id": "102"
+        },
+        "assertions": [
+          {
+            "pointer": "/id",
+            "op": "eq",
+            "value": "102"
+          },
+          {
+            "pointer": "/total",
+            "op": "eq",
+            "value": 41
+          }
+        ]
+      }
+    ],
+    "approve": [
+      {
+        "arguments": {
+          "id": "101",
+          "note": "trial 101",
+          "start": "2026-10-23"
+        },
+        "assertions": [
+          {
+            "pointer": "/body",
+            "op": "eq",
+            "value": {
+              "documentId": "101",
+              "payload": "{\"decision\":\"approved\",\"note\":\"trial 101\",\"due\":\"2026-11-22\",\"total\":25.0,\"version\":1}"
+            }
+          }
+        ]
+      },
+      {
+        "arguments": {
+          "id": "102",
+          "note": "trial 102",
+          "start": "2026-10-23"
+        },
+        "assertions": [
+          {
+            "pointer": "/body",
+            "op": "eq",
+            "value": {
+              "documentId": "102",
+              "payload": "{\"decision\":\"approved\",\"note\":\"trial 102\",\"due\":\"2026-11-22\",\"total\":41.0,\"version\":1}"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
