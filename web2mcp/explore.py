@@ -226,6 +226,42 @@ def synthesize_profile(directory, *, api_origin=None):
               'synthesized': True, 'captured': path.rstrip('/') in captured_paths}
         ops.append(op)
         n_read += read_only; n_write += (not read_only); n_captured += op['captured']
+    # Merge runtime-captured endpoints from capture.json. These carry the REAL request URL, which
+    # resolves endpoints the static map can't (paths assembled at runtime via custom HTTP wrappers,
+    # whose base segment is not a literal in the minified JS) — and, for writes, the real body
+    # shape from postData. Observed requests are reliable where static guessing is not.
+    seen_keys = {(o['method'], urlsplit(o['url']).path.rstrip('/')) for o in ops}
+    if cap_path.exists():
+        for ex in (load_json(cap_path).get('exchanges') or []):
+            req = ex.get('request', {})
+            method, url = (req.get('method') or '').upper(), req.get('url', '')
+            if not method or not url:
+                continue
+            parts = urlsplit(url)
+            path = parts.path.rstrip('/')
+            if f'{parts.scheme}://{parts.netloc}' not in origins or not _API_PATH.search(path):
+                continue
+            if (method, path) in seen_keys:
+                continue
+            seen_keys.add((method, path))
+            read_only = method in ('GET', 'HEAD')
+            body_keys = []
+            pd = req.get('postData')
+            if pd:
+                try:
+                    body_keys = list(json.loads(pd).keys()) if isinstance(json.loads(pd), dict) else []
+                except (ValueError, TypeError):
+                    body_keys = []
+            op = {'name': _op_name(method, path, taken), 'method': method,
+                  'url': f'{parts.scheme}://{parts.netloc}{parts.path}',
+                  'body': None, 'body_type': 'json', 'credential_ref': cred_ref, 'read_only': read_only,
+                  'description': f"{method} {path} (resolved from a runtime-captured request"
+                                 + (f"; body keys: {', '.join(body_keys)}" if body_keys else "") + ")",
+                  'input_schema': ({'type': 'object'} if read_only else
+                                   {'type': 'object', 'properties': {'body': {'type': 'object'}}, 'required': ['body']}),
+                  'synthesized': True, 'captured': True}
+            ops.append(op)
+            n_read += read_only; n_write += (not read_only); n_captured += 1
     out = root/'synth'
     out.mkdir(exist_ok=True)
     save_private(out/'manifest.json', {'allowed_origins': origins, 'operations': ops})
