@@ -36,6 +36,47 @@ The expression/pack reference and actual observed schemas are supplied by refere
 class ModelUnavailable(CallError):
     pass
 
+
+def extract_action(content):
+    """Parse one JSON action from a model reply. OpenAI-compatible gateways fronting Claude often
+    wrap JSON in a ```json fence or add surrounding prose even under json_object mode, so fall back
+    to stripping a code fence and then to the first balanced {...} object. Raises ValueError if no
+    JSON object is present (the caller maps that to a bounded model_output error)."""
+    if not isinstance(content, str):
+        raise ValueError('non-string model content')
+    text = content.strip()
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+    if text.startswith('```'):
+        inner = text[3:]
+        if inner[:4].lower() == 'json':
+            inner = inner[4:]
+        inner = inner.strip()
+        if inner.endswith('```'):
+            inner = inner[:-3].strip()
+        try:
+            return json.loads(inner)
+        except ValueError:
+            text = inner
+    start = text.find('{')
+    if start != -1:
+        depth, in_str, esc = 0, False, False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if in_str:
+                if esc: esc = False
+                elif ch == '\\': esc = True
+                elif ch == '"': in_str = False
+            elif ch == '"': in_str = True
+            elif ch == '{': depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    return json.loads(text[start:i + 1])
+    raise ValueError('no JSON object in model content')
+
 class ChatCompletionsPlanner:
     """Compatible chat-completions wire format; vendor adapters implement next(context)."""
     def __init__(self, config, *, transport=None):
@@ -79,7 +120,7 @@ class ChatCompletionsPlanner:
             choice = body['choices'][0]
             if choice.get('finish_reason') not in (None, 'stop'):
                 raise CallError('Model response incomplete; request a smaller step', reason='model_output')
-            try:return json.loads(choice['message']['content'])
+            try:return extract_action(choice['message']['content'])
             except (ValueError,TypeError):raise CallError('Model output must be one valid JSON action',reason='model_output') from None
         except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as error:
             # Provider bodies/errors can contain keys or echoed business data; never relay them.

@@ -237,3 +237,18 @@ def test_write_verification_is_bound_to_the_tested_revision(jobs):
     r=j.run(i,ChangedPlanner())
     assert d.writes==1 and r['status']=='partial'
     assert r['result']['capabilities'][0]['status']=='write_preflight_passed'
+
+
+def test_extract_action_tolerates_fenced_and_prose_json():
+    # OpenAI-compatible gateways fronting Claude often wrap the action in a ```json fence or prose
+    # even under json_object mode; the planner must still recover one valid action.
+    from web2mcp.planner import extract_action
+    assert extract_action('{"action":"observe","arguments":{}}')['action'] == 'observe'
+    assert extract_action('```json\n{"action":"propose","arguments":{}}\n```')['action'] == 'propose'
+    assert extract_action('```\n{"action":"finish","arguments":{}}\n```')['action'] == 'finish'
+    assert extract_action('Next step:\n{"action":"draft_pack","arguments":{}}\ndone')['action'] == 'draft_pack'
+    nested = extract_action('```json\n{"action":"call_tool","arguments":{"name":"x","body":{"q":"{a}"}}}\n```')
+    assert nested['arguments']['body']['q'] == '{a}'
+    import pytest
+    with pytest.raises(ValueError):
+        extract_action('no json here at all')
