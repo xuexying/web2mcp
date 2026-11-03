@@ -106,6 +106,12 @@ python -m web2mcp discover work/site.har \
 python -m web2mcp list work/site-profile
 ```
 
+不确定该填哪个 `--origin`？先 `inspect` 看 HAR 里每个来源的接口数、读写、是否带登录，并拿到可直接粘贴的 `discover` 建议命令（第三方/分析域会被标记并排除出建议）：
+
+```sh
+python -m web2mcp inspect work/site.har
+```
+
 一步产出**安全只读** MCP（只暴露读工具，写操作隐藏且被 `read_only_mode` 拦截）——加 `--read-only-safe`：
 
 ```sh

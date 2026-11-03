@@ -1,7 +1,7 @@
 import argparse
 import json
 from .client import Client
-from .discover import discover
+from .discover import discover, summarize_capture
 from .storage import load_json, save_private
 
 
@@ -14,6 +14,8 @@ def main():
     d.add_argument("--origin", action="append", required=True)
     d.add_argument("--policy", help="Reviewed names/descriptions/read-only overrides")
     d.add_argument("--read-only-safe", action="store_true", help="Produce a safe profile: expose only reads, hide and block all writes (read_only_mode)")
+    ins = commands.add_parser("inspect", help="Offline overview of a capture/HAR: per-origin ops and a suggested discover command")
+    ins.add_argument("capture")
     l = commands.add_parser("list")
     l.add_argument("profile")
     c = commands.add_parser("call")
@@ -94,6 +96,8 @@ def main():
     elif args.command == "discover":
         result = discover(args.capture, args.out, args.origin, load_json(args.policy) if args.policy else None,
                           read_only_safe=args.read_only_safe)
+    elif args.command == "inspect":
+        result = summarize_capture(args.capture)
     elif args.command == "serve":
         from .server import serve
         serve(args.profile)

@@ -174,6 +174,71 @@ def normalize_capture(value):
     return out
 
 
+_TRACKER_HINTS = ("google-analytics", "googletagmanager", "doubleclick", "googlesyndication",
+    "connect.facebook", "facebook.net", "segment.io", "segment.com", "sentry.io", "sentry-cdn",
+    "datadoghq", "browser-intake", "hotjar", "mixpanel", "amplitude", "fullstory", "clarity.ms",
+    "tiktok", "bytedance", "volces.com", "volccdn", "cloudflareinsights", "newrelic", "nr-data",
+    "optimizely", "appsflyer", "branch.io", "snowplow", "heap.io", "launchdarkly", "intercom",
+    "braze", "doubleverify", "scorecardresearch", "quantserve")
+
+
+def _looks_json(response):
+    if "json" in (response.get("mimeType") or "").lower():
+        return True
+    body = response.get("body")
+    if not body:
+        return False
+    try:
+        return isinstance(json.loads(body), (dict, list))
+    except (ValueError, TypeError):
+        return False
+
+
+def summarize_capture(capture_path):
+    """Offline overview of a capture/HAR: per-origin operation counts, read/write split, whether a
+    login is present, and a ready-to-paste discover command. Lets a user pick --origin from a HAR
+    without widening scope automatically — the human still chooses which origin(s) to integrate.
+    Likely third-party/analytics hosts are flagged and kept out of the suggestion."""
+    capture = normalize_capture(load_json(capture_path))
+    per = {}
+    for ex in capture.get("exchanges", []):
+        req = ex.get("request", {})
+        try:
+            parts = urlsplit(req.get("url", ""))
+        except ValueError:
+            continue
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            continue
+        origin = f"{parts.scheme}://{parts.netloc}"
+        info = per.setdefault(origin, {"origin": origin, "requests": 0, "read_ops": set(),
+            "write_ops": set(), "json_ops": set(), "has_login": False,
+            "likely_third_party": any(h in parts.hostname for h in _TRACKER_HINTS)})
+        info["requests"] += 1
+        method = (req.get("method") or "GET").upper()
+        key = (method, parts.path)
+        (info["read_ops"] if method in ("GET", "HEAD") else info["write_ops"]).add(key)
+        if _looks_json(ex.get("response", {})):
+            info["json_ops"].add(key)
+        headers = {k.lower(): v for k, v in (req.get("headers") or {}).items()}
+        if headers.get("cookie") or headers.get("authorization"):
+            info["has_login"] = True
+    for origin in capture.get("sessions", {}):
+        if origin in per:
+            per[origin]["has_login"] = True
+    rows = [{"origin": i["origin"], "requests": i["requests"], "read_ops": len(i["read_ops"]),
+             "write_ops": len(i["write_ops"]), "json_ops": len(i["json_ops"]),
+             "has_login": i["has_login"], "likely_third_party": i["likely_third_party"]}
+            for i in per.values()]
+    rows.sort(key=lambda r: (r["likely_third_party"], -r["json_ops"], -r["requests"]))
+    suggested = [r["origin"] for r in rows if not r["likely_third_party"] and r["json_ops"] > 0][:3]
+    command = None
+    if suggested:
+        origins = " ".join(f"--origin {o}" for o in suggested)
+        command = f"python -m web2mcp discover {capture_path} --out <profile> {origins} --read-only-safe"
+    return {"origins": rows, "suggested_origins": suggested, "suggested_command": command,
+            "note": "Review origins before integrating; third-party/analytics hosts are flagged and excluded from the suggestion."}
+
+
 def operation_groups(exchanges, policy):
     """Split RPC/GraphQL envelopes by explicitly reviewed JSON discriminators."""
     from .expressions import pointer

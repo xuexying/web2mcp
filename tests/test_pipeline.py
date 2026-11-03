@@ -245,3 +245,28 @@ def test_discover_read_only_safe(tmp_path):
     by_name = {o['name']: o for o in manifest['operations']}
     assert by_name['delete_all'].get('internal') is True
     assert not by_name['list_items'].get('internal')
+
+
+def test_summarize_capture_suggests_api_flags_tracker(tmp_path):
+    from web2mcp.discover import summarize_capture
+    value = {'format': 'web2mcp-capture-v1', 'cookies': [], 'exchanges': [
+        {'request': {'method': 'GET', 'url': 'https://api.example.com/v0/list',
+                     'headers': {'Cookie': 'sid=x'}},
+         'response': {'status': 200, 'mimeType': 'application/json', 'body': '[]'}},
+        {'request': {'method': 'POST', 'url': 'https://api.example.com/v0/save',
+                     'headers': {'Cookie': 'sid=x', 'content-type': 'application/json'},
+                     'postData': '{}'},
+         'response': {'status': 200, 'mimeType': 'application/json', 'body': '{"ok":true}'}},
+        {'request': {'method': 'POST', 'url': 'https://www.google-analytics.com/collect',
+                     'headers': {}},
+         'response': {'status': 200, 'mimeType': 'text/plain', 'body': ''}}]}
+    source = tmp_path / 'cap.json'; source.write_text(json.dumps(value))
+    summary = summarize_capture(source)
+    by_origin = {r['origin']: r for r in summary['origins']}
+    assert by_origin['https://api.example.com']['has_login'] is True
+    assert by_origin['https://api.example.com']['read_ops'] == 1
+    assert by_origin['https://api.example.com']['write_ops'] == 1
+    assert by_origin['https://www.google-analytics.com']['likely_third_party'] is True
+    assert summary['suggested_origins'] == ['https://api.example.com']
+    assert '--origin https://api.example.com' in summary['suggested_command']
+    assert 'google-analytics' not in (summary['suggested_command'] or '')
