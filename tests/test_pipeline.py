@@ -194,3 +194,54 @@ def test_http_errors_have_private_diagnostics_without_public_response_body(tmp_p
     records=list((tmp_path/'p'/'diagnostics').glob('*.json'))
     assert len(records)==1 and records[0].stat().st_mode & 0o777 == 0o600
     assert load_json(records[0])['response']['message']=='sensitive business diagnostic'
+
+
+def test_har_import_preserves_login_cookies(tmp_path):
+    # A HAR from a logged-in site (auth via Cookie header) must yield a usable cookie_session,
+    # not get its cookies dropped — otherwise HAR import is useless for authenticated sites.
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    har = {'log': {'entries': [{
+        'startedDateTime': now,
+        'request': {'method': 'GET', 'url': 'https://api.example.com/v0/me',
+            'headers': [{'name': 'Cookie', 'value': 'sid=secret-session; theme=dark'},
+                        {'name': 'User-Agent', 'value': 'Mozilla/5.0'}]},
+        'response': {'status': 200, 'content': {'mimeType': 'application/json', 'text': '{"id":1}'},
+            'cookies': [{'name': 'sid', 'value': 'secret-session', 'domain': '.example.com',
+                         'path': '/', 'httpOnly': True, 'secure': True}]}}]}}
+    cap = normalize_capture(har)
+    snapshot = cap['sessions']['https://api.example.com']
+    assert {c['name'] for c in snapshot['cookies']} == {'sid', 'theme'}
+    assert snapshot['captured_at'][:4] != '1970'
+    sid = next(c for c in snapshot['cookies'] if c['name'] == 'sid')
+    assert sid['domain'] == '.example.com' and sid['hostOnly'] is False and sid['secure'] is True
+
+    source = tmp_path / 'cap.json'; source.write_text(json.dumps(cap))
+    discover(source, tmp_path / 'p', ['https://api.example.com'], {'GET /v0/me': {'name': 'get_me'}})
+    creds = json.loads((tmp_path / 'p' / 'credentials.json').read_text())
+    sessions = [a['session'] for a in creds['auth'].values() if a.get('type') == 'cookie_session']
+    assert sessions, 'HAR login did not become a cookie_session'
+    assert 'sid' in sessions[0]['cookie_names']
+    assert sessions[0]['captured_at'][:4] != '1970'
+
+
+def test_discover_read_only_safe(tmp_path):
+    # One-step safe profile: reads exposed, writes hidden AND blocked.
+    value = {'format': 'web2mcp-capture-v1', 'cookies': [], 'exchanges': [
+        {'request': {'method': 'GET', 'url': 'https://example.org/items', 'headers': {}},
+         'response': {'status': 200, 'mimeType': 'application/json', 'body': '[{"id":1}]'}},
+        {'request': {'method': 'POST', 'url': 'https://example.org/delete_all',
+                     'headers': {'content-type': 'application/json'}, 'postData': '{}'},
+         'response': {'status': 200, 'mimeType': 'application/json', 'body': '{"ok":true}'}}]}
+    source = tmp_path / 'cap.json'; source.write_text(json.dumps(value))
+    prof = tmp_path / 'p'
+    discover(source, prof, ['https://example.org'],
+             {'GET /items': {'name': 'list_items'},
+              'POST /delete_all': {'name': 'delete_all', 'read_only': False}},
+             read_only_safe=True)
+    manifest = json.loads((prof / 'manifest.json').read_text())
+    assert manifest['read_only_mode'] is True
+    assert manifest['allowed_methods'] == ['GET', 'HEAD']
+    by_name = {o['name']: o for o in manifest['operations']}
+    assert by_name['delete_all'].get('internal') is True
+    assert not by_name['list_items'].get('internal')

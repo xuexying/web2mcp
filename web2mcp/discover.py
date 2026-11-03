@@ -74,24 +74,104 @@ def scoped_cookies(cookies, urls):
     return result
 
 
+def _har_expires_to_epoch(expires):
+    """HAR Set-Cookie expires is ISO 8601; map to epoch seconds, -1 for session cookies."""
+    if expires in (None, "", -1, "-1"):
+        return -1
+    if isinstance(expires, (int, float)):
+        return int(expires)
+    from datetime import datetime, timezone
+    try:
+        dt = datetime.fromisoformat(str(expires).replace("Z", "+00:00"))
+        return int((dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).timestamp())
+    except ValueError:
+        return -1
+
+
 def normalize_capture(value):
     if value.get("format") == "web2mcp-capture-v1":
         return value
     if "log" not in value:
         raise ValueError("Expected web2mcp capture or HAR 1.2")
+    from http.cookies import SimpleCookie
     exchanges = []
+    # Reconstruct a per-origin cookie snapshot from the HAR so logged-in sites work from an
+    # imported HAR, not only from live browser capture. The authoritative current value is what
+    # the browser actually SENT (request Cookie header / request.cookies); response Set-Cookie
+    # only enriches metadata (domain/path/expires/secure) and seeds set-but-not-yet-sent cookies.
+    origin_jars = {}   # origin -> {name: cookie record}
+    origin_time = {}   # origin -> latest startedDateTime (ISO, carries tz)
+    latest_overall = None
     for entry in value["log"]["entries"]:
         req, res = entry["request"], entry["response"]
         content = res.get("content", {})
         body = content.get("text")
         if body and content.get("encoding") == "base64":
             body = base64.b64decode(body).decode("utf-8", errors="replace")
+        req_headers = {h["name"]: h["value"] for h in req.get("headers", [])}
         exchanges.append({"request": {"method": req["method"], "url": req["url"],
-            "headers": {h["name"]: h["value"] for h in req.get("headers", [])},
+            "headers": req_headers,
             "postData": req.get("postData", {}).get("text")},
             "response": {"status": res["status"], "mimeType": content.get("mimeType", ""), "body": body},
             "label": entry.get("comment", "Imported HAR")})
-    return {"format": "web2mcp-capture-v1", "exchanges": exchanges, "cookies": []}
+        try:
+            parts = urlsplit(req["url"])
+        except ValueError:
+            continue
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            continue
+        origin = f"{parts.scheme}://{parts.netloc}"
+        host, secure = parts.hostname, parts.scheme == "https"
+        started = entry.get("startedDateTime")
+        if started:
+            if started > origin_time.get(origin, ""):
+                origin_time[origin] = started
+            if latest_overall is None or started > latest_overall:
+                latest_overall = started
+        jar = origin_jars.setdefault(origin, {})
+        # Sent cookies: prefer the structured request.cookies, else parse the Cookie header.
+        sent = {c["name"]: c.get("value", "") for c in req.get("cookies", []) or [] if c.get("name")}
+        if not sent:
+            raw = req_headers.get("Cookie") or req_headers.get("cookie")
+            if raw:
+                jar_cookie = SimpleCookie()
+                try:
+                    jar_cookie.load(raw)
+                    sent = {k: m.value for k, m in jar_cookie.items()}
+                except Exception:
+                    sent = {}
+        for name, val in sent.items():
+            record = jar.setdefault(name, {"name": name, "value": val, "domain": host,
+                "hostOnly": True, "path": "/", "secure": secure, "expires": -1})
+            record["value"] = val  # last value the browser actually sent wins
+        # Set-Cookie: enrich metadata; seed cookies set but not (yet) seen in a request.
+        for c in res.get("cookies", []) or []:
+            name = c.get("name")
+            if not name:
+                continue
+            record = jar.setdefault(name, {"name": name, "value": c.get("value", ""),
+                "domain": host, "hostOnly": True, "path": "/", "secure": secure, "expires": -1})
+            domain = c.get("domain")
+            if domain:
+                record["domain"], record["hostOnly"] = domain, not str(domain).startswith(".")
+            if c.get("path"):
+                record["path"] = c["path"]
+            if "secure" in c:
+                record["secure"] = bool(c["secure"])
+            if "httpOnly" in c:
+                record["httpOnly"] = bool(c["httpOnly"])
+            if c.get("expires"):
+                record["expires"] = _har_expires_to_epoch(c.get("expires"))
+    sessions = {origin: {"captured_at": origin_time.get(origin) or latest_overall,
+                         "cookies": list(jar.values())}
+                for origin, jar in origin_jars.items() if jar}
+    out = {"format": "web2mcp-capture-v1", "exchanges": exchanges,
+           "cookies": [c for jar in origin_jars.values() for c in jar.values()]}
+    if sessions:
+        out["sessions"] = sessions
+    if latest_overall:
+        out["captured_at"] = latest_overall
+    return out
 
 
 def operation_groups(exchanges, policy):
@@ -122,7 +202,7 @@ def operation_groups(exchanges, policy):
             yield method, origin, path, selected, parameters, {**setting, **variant}
 
 
-def discover(capture_path, destination, origins, policy=None):
+def discover(capture_path, destination, origins, policy=None, *, read_only_safe=False):
     capture = normalize_capture(load_json(capture_path))
     policy = policy or {}
     root = Path(destination).resolve()
@@ -225,6 +305,15 @@ def discover(capture_path, destination, origins, policy=None):
     credentials['cookies'] = scoped_cookies(capture.get('cookies', []) + fallback_cookies, used_urls)
     manifest = {"version": 2, "allowed_origins": sorted(origins), "operations": operations,
                 "limitations": ["Observed flows only; no completeness guarantee", "Observed presence/constant values are candidates, not required/enum rules", "Identifier-shaped path inference requires trial validation", "Writes preview unless confirmed", "Static signatures require adapters"]}
+    if read_only_safe:
+        # One-step safe read-only profile: hide every non-read operation and refuse any
+        # non-GET/HEAD call at the execution layer. Writes stay in the manifest for review
+        # but are neither exposed as MCP tools nor callable until deliberately re-enabled.
+        for op in operations:
+            if not op.get("read_only"):
+                op["internal"] = True
+        manifest["read_only_mode"] = True
+        manifest["allowed_methods"] = ["GET", "HEAD"]
     save_private(root / "manifest.json", manifest)
     save_private(root / "credentials.json", credentials)
     paths = {}

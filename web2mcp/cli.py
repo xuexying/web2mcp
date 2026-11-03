@@ -13,6 +13,7 @@ def main():
     d.add_argument("--out", required=True)
     d.add_argument("--origin", action="append", required=True)
     d.add_argument("--policy", help="Reviewed names/descriptions/read-only overrides")
+    d.add_argument("--read-only-safe", action="store_true", help="Produce a safe profile: expose only reads, hide and block all writes (read_only_mode)")
     l = commands.add_parser("list")
     l.add_argument("profile")
     c = commands.add_parser("call")
@@ -91,7 +92,8 @@ def main():
         from .audit import purge_diagnostics
         result=purge_diagnostics(args.profile,args.days)
     elif args.command == "discover":
-        result = discover(args.capture, args.out, args.origin, load_json(args.policy) if args.policy else None)
+        result = discover(args.capture, args.out, args.origin, load_json(args.policy) if args.policy else None,
+                          read_only_safe=args.read_only_safe)
     elif args.command == "serve":
         from .server import serve
         serve(args.profile)

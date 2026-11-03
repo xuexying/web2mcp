@@ -95,6 +95,8 @@ python -m pytest -q
 
 仅使用你有权限操作的站点。将 HAR 或 `web2mcp-capture-v1` 文件放入本地私有目录，先检查其中的账号、业务正文和请求范围。
 
+无需 `ego-browser`：在**任意**浏览器里登录目标站点、操作几下，用开发者工具（Network 面板 → 右键 → Save all as HAR）导出 `.har` 即可。HAR 导入会从请求 Cookie 头与响应 Set-Cookie 重建带 `captured_at` 的 cookie 快照，**登录态随 HAR 一起带入**（纯 Cookie 登录的站点也能生成可用的 `cookie_session`）。导出时勾选"包含响应正文"。
+
 ```sh
 python -m web2mcp discover work/site.har \
   --out work/site-profile \
@@ -104,7 +106,15 @@ python -m web2mcp discover work/site.har \
 python -m web2mcp list work/site-profile
 ```
 
-`examples/policy.json` 是格式示例，需要改成实际观察到的路径和读写语义。HTTP 方法本身不足以判断读写；查询也可能使用 POST。
+一步产出**安全只读** MCP（只暴露读工具，写操作隐藏且被 `read_only_mode` 拦截）——加 `--read-only-safe`：
+
+```sh
+python -m web2mcp discover work/site.har \
+  --out work/site-profile --origin https://api.example.com --read-only-safe
+python -m web2mcp serve work/site-profile
+```
+
+`examples/policy.json` 是格式示例，需要改成实际观察到的路径和读写语义。HTTP 方法本身不足以判断读写；查询也可能使用 POST。确认要开写入时，去掉 `--read-only-safe` 并为写操作配置经过审查的契约。
 
 继续用 `trial-read` / `publish-reads`，或 `draft-pack` → `check-pack` → `trial-pack` → `install-pack` 验证并发布工具。生产写入应使用经过审查的契约，不直接暴露未经验证的候选操作。完整命令见 [接入与验证指南](docs/INTEGRATION.md)，接入包语法见 [pack_reference.md](web2mcp/pack_reference.md)。
 
