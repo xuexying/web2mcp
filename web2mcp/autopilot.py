@@ -512,7 +512,9 @@ class IntegrationJobs:
     def context(self, job, driver):
         guide = Path(__file__).resolve().parent / "pack_reference.md"
         reference = (
-            guide.read_text()[:16000] if guide.exists() else "Use draft_pack and actual operation schemas."
+            guide.read_text(encoding="utf-8")[:16000]
+            if guide.exists()
+            else "Use draft_pack and actual operation schemas."
         )
         context = self.clean(
             {

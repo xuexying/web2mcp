@@ -681,11 +681,11 @@ def discover(capture_path, destination, origins, policy=None, *, read_only_safe=
         {"openapi": "3.1.0", "info": {"title": "Browser-observed API", "version": "0.1.0"}, "paths": paths},
     )
     server = 'from pathlib import Path\nfrom web2mcp.server import serve\nif __name__ == "__main__":\n    serve(Path(__file__).resolve().parent)\n'
-    (root / "server.py").write_text(server)
+    (root / "server.py").write_text(server, encoding="utf-8")
     code = "from pathlib import Path\nfrom web2mcp import Client\n\nclass GeneratedClient(Client):\n    def __init__(self):\n        super().__init__(Path(__file__).resolve().parent)\n"
     for op in operations:
         code += f'\n    def {op["name"]}(self, *, path=None, query=None, body=None, confirm=False):\n        arguments = {{}}\n        if path is not None: arguments["path"] = path\n        if query is not None: arguments["query"] = query\n        if body is not None: arguments["body"] = body\n        return self.call({op["name"]!r}, arguments, confirm=confirm)\n'
-    (root / "client.py").write_text(code)
+    (root / "client.py").write_text(code, encoding="utf-8")
     save_private(
         root / "mcp.json",
         {"mcpServers": {"web2mcp": {"command": sys.executable, "args": [str(root / "server.py")]}}},

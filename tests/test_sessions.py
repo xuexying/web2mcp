@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from datetime import datetime, timezone
 
@@ -95,9 +96,9 @@ def test_discovery_private_metadata_and_replay(session):
     assert auth["session"]["captured_at"] and auth["session"]["header_names"]
     assert client.call("me")["data"]["authenticated"]
     for name in ["manifest.json", "openapi.json", "client.py", "server.py", "mcp.json"]:
-        assert "session-one" not in (client.root / name).read_text()
-    assert (client.root / "credentials.json").stat().st_mode & 0o777 == 0o600
-    assert "session-one" not in (client.root / "audit/calls.jsonl").read_text()
+        assert "session-one" not in (client.root / name).read_text(encoding="utf-8")
+    assert os.name != "posix" or (client.root / "credentials.json").stat().st_mode & 0o777 == 0o600
+    assert "session-one" not in (client.root / "audit/calls.jsonl").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("status", [401, 403])
@@ -175,8 +176,8 @@ def test_refresh_same_identity_keeps_manifest_and_checks_new_session(session):
     result = refresh_credentials(client.root, fresh, transport=transport)
     assert result["refreshed"] and (client.root / "manifest.json").read_bytes() == before
     assert load_json(client.root / "cards/login.json")["state"] == "resolved"
-    assert "session-two" in (client.root / "credentials.json").read_text()
-    assert "session-two" not in (client.root / "audit/calls.jsonl").read_text()
+    assert "session-two" in (client.root / "credentials.json").read_text(encoding="utf-8")
+    assert "session-two" not in (client.root / "audit/calls.jsonl").read_text(encoding="utf-8")
 
 
 def test_refresh_wrong_identity_does_not_replace_credentials(session):
@@ -293,7 +294,7 @@ def test_password_input_rejected_before_persistence(tmp_path, selector, fields):
             runner=never,
         )
     assert caught.value.reason == "login"
-    assert not any("must-not-save" in p.read_text() for p in tmp_path.rglob("*.json"))
+    assert not any("must-not-save" in p.read_text(encoding="utf-8") for p in tmp_path.rglob("*.json"))
 
 
 def test_numeric_truth_is_not_authenticated_boolean(session):

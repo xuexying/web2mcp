@@ -155,7 +155,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     profile = Path(args.profile).resolve()
     session = load_json(profile.parent / "session.json")
-    assert session["stage"] == "finished", "Close the browser exploration space before browser-free validation"
+    assert session["stage"] == "finished", (
+        "Close the browser exploration space before browser-free validation"
+    )
     names, trials = prepare(profile)
     result = asyncio.run(validate(profile, names))
     result.update(

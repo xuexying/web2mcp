@@ -2,6 +2,7 @@ import asyncio
 import base64
 import importlib.util
 import json
+import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -162,8 +163,8 @@ def test_expired_auth_and_redirect(profile):
 def test_no_credentials_in_generated_spec_or_code(profile):
     root, _ = profile
     for name in ["manifest.json", "openapi.json", "client.py", "server.py", "mcp.json"]:
-        assert "fixture-secret" not in (root / name).read_text()
-    assert (root / "credentials.json").stat().st_mode & 0o777 == 0o600
+        assert "fixture-secret" not in (root / name).read_text(encoding="utf-8")
+    assert os.name != "posix" or (root / "credentials.json").stat().st_mode & 0o777 == 0o600
 
 
 def test_har_import():
@@ -269,7 +270,8 @@ def test_http_errors_have_private_diagnostics_without_public_response_body(tmp_p
             c.call("search")
     assert "sensitive business diagnostic" not in str(error.value)
     records = list((tmp_path / "p" / "diagnostics").glob("*.json"))
-    assert len(records) == 1 and records[0].stat().st_mode & 0o777 == 0o600
+    assert len(records) == 1
+    assert os.name != "posix" or records[0].stat().st_mode & 0o777 == 0o600
     assert load_json(records[0])["response"]["message"] == "sensitive business diagnostic"
 
 
@@ -320,7 +322,7 @@ def test_har_import_preserves_login_cookies(tmp_path):
     source = tmp_path / "cap.json"
     source.write_text(json.dumps(cap))
     discover(source, tmp_path / "p", ["https://api.example.com"], {"GET /v0/me": {"name": "get_me"}})
-    creds = json.loads((tmp_path / "p" / "credentials.json").read_text())
+    creds = json.loads((tmp_path / "p" / "credentials.json").read_text(encoding="utf-8"))
     sessions = [a["session"] for a in creds["auth"].values() if a.get("type") == "cookie_session"]
     assert sessions, "HAR login did not become a cookie_session"
     assert "sid" in sessions[0]["cookie_names"]
@@ -361,7 +363,7 @@ def test_discover_read_only_safe(tmp_path):
         },
         read_only_safe=True,
     )
-    manifest = json.loads((prof / "manifest.json").read_text())
+    manifest = json.loads((prof / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["read_only_mode"] is True
     assert manifest["allowed_methods"] == ["GET", "HEAD"]
     by_name = {o["name"]: o for o in manifest["operations"]}

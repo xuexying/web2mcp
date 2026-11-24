@@ -23,8 +23,8 @@ def test_bodies_stay_in_memory_and_status_after_restart_is_honest(fixture):
     e.submit("purchase_approve", p["preview_id"])
     assert e.status("purchase_approve", p["preview_id"])["readback_verified"]
     for f in c.root.rglob("*.json*"):
-        assert "PRIVATE_SENTINEL_DO_NOT_PERSIST" not in f.read_text()
-        assert "PRIVATE_BUDGET" not in f.read_text()
+        assert "PRIVATE_SENTINEL_DO_NOT_PERSIST" not in f.read_text(encoding="utf-8")
+        assert "PRIVATE_BUDGET" not in f.read_text(encoding="utf-8")
     restarted = ContractEngine(c)
     assert restarted.status("purchase_approve", p["preview_id"])["state"] == "needs_check"
     with pytest.raises(CallError):
@@ -46,4 +46,4 @@ def test_unknown_keeps_durable_duplicate_guard_without_body(fixture):
         fresh.submit("purchase_approve", q["preview_id"])
     assert s["writes"] == 1
     for f in c.root.rglob("*.json*"):
-        assert "PRIVATE_UNKNOWN_SENTINEL" not in f.read_text()
+        assert "PRIVATE_UNKNOWN_SENTINEL" not in f.read_text(encoding="utf-8")

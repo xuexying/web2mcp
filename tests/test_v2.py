@@ -318,9 +318,11 @@ def test_audit_omits_arguments_and_detects_tamper(fixture):
     c, *_ = fixture
     c.call("decide", {"path": {"record_id": "101"}, "body": {"note": "private business content"}})
     log = c.root / "audit" / "calls.jsonl"
-    assert "private business content" not in log.read_text() and "fixture-old" not in log.read_text()
+    assert "private business content" not in log.read_text(
+        encoding="utf-8"
+    ) and "fixture-old" not in log.read_text(encoding="utf-8")
     assert c.audit.verify()["valid"]
-    log.write_text(log.read_text().replace("preview", "tampered"))
+    log.write_text(log.read_text(encoding="utf-8").replace("preview", "tampered"))
     assert not c.audit.verify()["valid"]
 
 
@@ -480,7 +482,7 @@ def test_secret_request_body_not_baked_into_generated_tools(tmp_path):
     )
     save_private(tmp_path / "cap.json", cap)
     discover(tmp_path / "cap.json", tmp_path / "profile", [ORIGIN])
-    manifest = (tmp_path / "profile" / "manifest.json").read_text()
+    manifest = (tmp_path / "profile" / "manifest.json").read_text(encoding="utf-8")
     assert "secret-value" not in manifest and "/api/exchange" not in manifest
 
 
@@ -510,7 +512,7 @@ def test_moved_profile_mcp_imports_package_and_hides_internal_tools(fixture, tmp
     save_private(c.root / "manifest.json", manifest)
     moved = tmp_path / "new-location"
     shutil.copytree(c.root, moved)
-    assert "sys.path.insert" not in (moved / "server.py").read_text()
+    assert "sys.path.insert" not in (moved / "server.py").read_text(encoding="utf-8")
 
     async def run():
         async with stdio_client(

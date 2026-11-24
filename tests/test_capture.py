@@ -1,6 +1,7 @@
 """Collector regression: responseReceived is not yet a readable response body."""
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -49,7 +50,7 @@ console.log(JSON.stringify({result,rounds,calls}));
         timeout=5,
     )
     result = json.loads(completed.stdout)
-    data = json.loads((tmp_path / "capture" / "capture.json").read_text())
+    data = json.loads((tmp_path / "capture" / "capture.json").read_text(encoding="utf-8"))
     response = data["exchanges"][0]["response"]
     assert result["rounds"] == 2
     assert result["calls"] == ["Network.getResponseBody", "Network.getCookies"]
@@ -105,7 +106,7 @@ console.log(JSON.stringify({result,calls}));
     )
     result = json.loads(done.stdout)
     path = tmp_path / "capture/capture.json"
-    raw = path.read_text()
+    raw = path.read_text(encoding="utf-8")
     data = json.loads(raw)
     assert len(data["exchanges"]) == 1
     assert data["exchanges"][0]["request"]["headers"]["X-Auth"] == "private-header"
@@ -113,6 +114,6 @@ console.log(JSON.stringify({result,calls}));
     assert [c["name"] for c in data["cookies"]] == ["sid"]
     snapshot = data["sessions"]["https://fixture.example"]
     assert snapshot["captured_at"] and snapshot["cookies"][0]["hostOnly"] is False
-    assert path.stat().st_mode & 0o777 == 0o600
+    assert os.name != "posix" or path.stat().st_mode & 0o777 == 0o600
     assert "private-session" not in json.dumps(result["result"])
     assert len([c for c in result["calls"] if c["method"] == "Network.getResponseBody"]) == 1

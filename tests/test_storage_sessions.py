@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -92,10 +93,10 @@ def test_private_minimum_credentials_and_fresh_headers(tmp_path, strategy):
         c.call("me")
         assert all("cookie" not in r.headers for r in calls)
         assert all(r.headers["authorization"] == "Bearer one" for r in calls)
-    assert "do-not-copy" not in (p / "credentials.json").read_text()
-    assert (p / "credentials.json").stat().st_mode & 0o777 == 0o600
+    assert "do-not-copy" not in (p / "credentials.json").read_text(encoding="utf-8")
+    assert os.name != "posix" or (p / "credentials.json").stat().st_mode & 0o777 == 0o600
     assert all(
-        "private-key" not in (p / f).read_text()
+        "private-key" not in (p / f).read_text(encoding="utf-8")
         for f in ["manifest.json", "openapi.json", "audit/calls.jsonl"]
     )
 
@@ -139,7 +140,7 @@ def test_auth_and_sensitive_error_no_retry_no_leak(tmp_path, status):
         if status != 500:
             assert e.value.reason == "session_relay_required"
     for f in p.rglob("*.json*"):
-        assert "PRIVATE_BODY_NAME" not in f.read_text()
+        assert "PRIVATE_BODY_NAME" not in f.read_text(encoding="utf-8")
 
 
 def test_relay_enforces_token_identity_and_manifest_unchanged(tmp_path):
@@ -190,7 +191,7 @@ def test_storage_snapshot_renewal_preserves_tools_and_old_credentials_on_failure
 
     if change == "success":
         assert refresh_storage_credentials(p, snap, transport=httpx.MockTransport(handler))["refreshed"]
-        assert "new-secret" in (p / "credentials.json").read_text() and len(calls) == 1
+        assert "new-secret" in (p / "credentials.json").read_text(encoding="utf-8") and len(calls) == 1
     else:
         with pytest.raises(CallError):
             refresh_storage_credentials(p, snap, transport=httpx.MockTransport(handler))
@@ -224,4 +225,4 @@ await assert.rejects(captureStorage(page,[source]));
         capture_output=True,
         timeout=10,
     )
-    assert (tmp_path / "private/storage.json").stat().st_mode & 0o777 == 0o600
+    assert os.name != "posix" or (tmp_path / "private/storage.json").stat().st_mode & 0o777 == 0o600
