@@ -4,7 +4,7 @@
 
 ## 1. 采集与发现
 
-可以导入 HAR 1.2（不需要任何浏览器工具），或通过 `explore-start`、`explore-round`、`explore-propose` 采集与起草。交互式探索需要 [ego-browser](https://github.com/citrolabs/ego-lite)（可选组件，免费，目前支持 macOS 和 Windows），先运行 `ego-browser skill` 并按当前浏览器版本的说明操作。
+可以导入 HAR 1.2（不需要任何浏览器工具），或用 `web2mcp record <url>` 一条命令采集（需 `pip install 'web2mcp[record]'`），或通过 `explore-start`、`explore-round`、`explore-propose` 采集与起草。交互式探索用 `--backend` 选择浏览器后端：`playwright`（内置 Chromium，跨平台）、`ego`（[ego-browser](https://github.com/citrolabs/ego-lite)，可选，免费，macOS 和 Windows）、`cdp`（连接你已启动的 Chrome 远程调试端口）。默认 auto：有 ego 用 ego，否则用 playwright。用 ego 时先运行 `ego-browser skill`。
 
 ```sh
 python -m web2mcp explore-start work/session \

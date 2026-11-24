@@ -113,16 +113,20 @@ To enable writes: review semantics, then use `trial-read` / `publish-reads`, or 
 
 ### 3. AI-driven browser exploration (experimental)
 
-Requires a browser backend: [ego-browser](https://github.com/citrolabs/ego-lite) (optional; free; currently macOS and Windows — the HAR path does not need it).
+Needs a browser backend, selected with `--backend` (default: auto):
+
+- `playwright` — bundled Chromium, cross-platform (`pip install 'web2mcp[record]'`).
+- `ego` — [ego-browser](https://github.com/citrolabs/ego-lite) (optional; free; macOS and Windows).
+- `cdp` — attach to a Chrome you started with `--remote-debugging-port=9222`, reusing its live login.
 
 ```sh
 python -m web2mcp explore-start work/exploration \
-  --url https://example.com \
+  --url https://example.com --backend playwright \
   --goal 'read the task list and details, verify two different tasks'
 python -m web2mcp serve-explorer work/exploration
 ```
 
-A connected AI observes pages, drives bounded reviewed UI actions, drafts candidate configs, runs trials and installs tools. You complete logins yourself in the browser — the program never receives passwords or verification codes. `source-map` / `explore-survey` / `synth-profile` can map an app's API surface from its shipped JavaScript plus runtime capture; synthesized profiles default to `read_only_mode`.
+A connected AI observes pages, drives bounded reviewed UI actions, drafts candidate configs, runs trials and installs tools. You complete logins yourself in the browser — the program never receives passwords or verification codes. `source-map` / `explore-survey` / `synth-profile` can map an app's API surface from its shipped JavaScript plus runtime capture; synthesized profiles default to `read_only_mode`. (The HAR path and `web2mcp record` need no backend at all.)
 
 ### 4. Autopilot integration service (experimental — not yet validated on a real site)
 

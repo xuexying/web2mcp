@@ -70,6 +70,11 @@ def _main():
     e.add_argument("--origin", action="append")
     e.add_argument("--budget", type=int, default=40)
     e.add_argument(
+        "--backend",
+        choices=("ego", "playwright", "cdp"),
+        help="Browser backend (default: auto — ego if installed, else playwright)",
+    )
+    e.add_argument(
         "--storage-sources",
         help="JSON file declaring exact origin/localStorage/sessionStorage keys; no values",
     )
@@ -168,6 +173,7 @@ def _main():
                 args.origin,
                 args.budget,
                 load_json(args.storage_sources) if args.storage_sources else None,
+                backend=args.backend,
             )
         elif args.command == "explore-round":
             result = explore_round(args.directory, load_json(args.action_file))

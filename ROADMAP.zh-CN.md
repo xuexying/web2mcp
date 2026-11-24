@@ -29,10 +29,11 @@
 
 ## P0 — 让第三方"能用起来"（当前最大堵点）
 
-- **P0-1 砍掉 `ego-browser` 硬依赖，采集后端可替换。** ✅ 部分完成：`web2mcp record <url>`
-  用 Playwright 打开 Chromium 窗口（`pip install 'web2mcp[record]'`），不依赖 ego-browser
-  即可产出 capture——只装 Python + Playwright 的陌生用户在任意系统都能跑完整采集。
-  剩余：把 AI 驱动的*探索*流程（不只是一次性 record）的后端也做成可替换。
+- **P0-1 砍掉 `ego-browser` 硬依赖，采集后端可替换。** ✅ 完成：`web2mcp record <url>`
+  用 Playwright 采集、不依赖 ego-browser；AI 驱动的探索流程也做成可替换后端
+  （`--backend ego|playwright|cdp`，默认 auto），`playwright` 后端在任意系统都能跑
+  测绘和 observe 轮（`pip install 'web2mcp[record]'`）。ego-browser 降为可选项之一。
+  剩余打磨：Playwright 版 survey 已覆盖 `<a href>` 爬取，但还没做 ego 后端那套 SPA 点击导航。
 - **P0-2 把 HAR 导入扶正为一等公民路径。** HAR 是唯一浏览器无关入口；文档给出
   "DevTools 导出 HAR → discover" 一键示例。
   验收：无任何浏览器工具的用户靠一个 HAR 文件也能出 MCP。

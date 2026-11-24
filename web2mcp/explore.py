@@ -18,7 +18,21 @@ from .locks import LockHeld, acquire_nonblocking
 from .storage import load_json, save_private
 
 
-def start_session(directory, url, goal, origins=None, budget=40, storage_sources=None):
+def _resolve_backend(state, runner, backend):
+    """Pick the browser backend for a round. An explicit ``backend`` wins; a legacy
+    ``runner`` means the ego backend (preserves injected-runner tests); otherwise the
+    session's recorded backend name, else auto-selection (ego → playwright → cdp)."""
+    if backend is not None:
+        return backend
+    from .backends import get_backend
+    from .backends.ego import EgoBackend
+
+    if runner is not None:
+        return EgoBackend(runner=runner)
+    return get_backend(state.get("backend"))
+
+
+def start_session(directory, url, goal, origins=None, budget=40, storage_sources=None, backend=None):
     root = Path(directory).resolve()
     if (root / "session.json").exists():
         raise CallError("Session already exists; resume it")
@@ -28,6 +42,8 @@ def start_session(directory, url, goal, origins=None, budget=40, storage_sources
         raise CallError("Goal and bounded action budget required")
     if urlsplit(url).scheme not in ("http", "https") or origin not in origins or urlsplit(url).username:
         raise CallError("Invalid start URL/scope")
+    if backend is not None and backend not in ("ego", "playwright", "cdp"):
+        raise CallError("Unknown backend; choose ego, playwright or cdp")
     state = {
         "version": 1,
         "id": uuid.uuid4().hex,
@@ -39,6 +55,7 @@ def start_session(directory, url, goal, origins=None, budget=40, storage_sources
         "round": 0,
         "stage": "created",
         "space_id": None,
+        "backend": backend,
     }
     if storage_sources is not None:
         if (
@@ -58,7 +75,7 @@ def start_session(directory, url, goal, origins=None, budget=40, storage_sources
     return {"directory": str(root), **state, "next": "observe, then choose actions from the actual snapshot"}
 
 
-def explore_round(directory, action, *, runner=subprocess.run):
+def explore_round(directory, action, *, runner=None, backend=None):
     root = Path(directory).resolve()
     if not (root / "session.json").exists():
         raise CallError("Create a scoped exploration session first")
@@ -67,12 +84,12 @@ def explore_round(directory, action, *, runner=subprocess.run):
     except LockHeld:
         raise CallError("An exploration round is already running; do not overlap actions") from None
     try:
-        return _explore_round(root, action, runner=runner)
+        return _explore_round(root, action, runner=runner, backend=backend)
     finally:
         lock.release()
 
 
-def _explore_round(directory, action, *, runner):
+def _explore_round(directory, action, *, runner=None, backend=None):
     root = Path(directory).resolve()
     state = load_json(root / "session.json")
     if state["stage"] == "finished":
@@ -116,42 +133,29 @@ def _explore_round(directory, action, *, runner):
                 if f"{parsed.scheme}://{parsed.netloc}" not in state["origins"]:
                     raise CallError("Navigation outside scope")
         state["actions_used"] += len(steps)
+    # Resolve the backend before marking the round running, so an unavailable-backend
+    # error (with install guidance) does not leave the session stuck in 'running'.
+    chosen = _resolve_backend(state, runner, backend)
     state["round"] += 1
     number = state["round"]
     run_id = f"{number:03d}-{uuid.uuid4().hex[:8]}"
     payload = {"root": str(root), "state": state, "action": action, "run_id": run_id}
     save_private(root / "rounds" / (run_id + ".input.json"), payload)
-    bridge = (Path(__file__).parent / "ego_explorer.mjs").resolve().as_uri()
-    input_path = str(root / "rounds" / (run_id + ".input.json"))
-    script = root / "rounds" / (run_id + ".mjs")
-    script.write_text(
-        "const { run } = await import("
-        + json.dumps(bridge)
-        + ");\nawait run("
-        + json.dumps(input_path)
-        + ");\n"
-    )
-    script.chmod(0o600)
     state["stage"] = "running"
     save_private(root / "session.json", state)
+    output = root / "rounds" / (run_id + ".output.json")
     try:
         # Cold SPA navigation can exceed one minute; allow a bounded host override.
         # A survey visits many views in one invocation, so it needs proportionally longer.
         round_timeout = int(os.environ.get("WEB2MCP_ROUND_TIMEOUT", "240"))
         if kind == "survey":
             round_timeout = max(round_timeout, min(1800, action.get("max_pages", 20) * 25 + 60))
-        completed = runner(
-            ["ego-browser", "nodejs", "-e", "await import(" + json.dumps(script.as_uri()) + ")"],
-            capture_output=True,
-            text=True,
-            timeout=round_timeout,
-        )
-        output = root / "rounds" / (run_id + ".output.json")
-        if completed.returncode != 0 or not output.exists():
+        result = chosen.run_round(root, run_id, timeout=round_timeout)
+        if not result.get("ok") or not output.exists():
             # Keep detailed CLI diagnostics private; do not forward credential-bearing traces.
             save_private(
                 root / "rounds" / (run_id + ".failure.json"),
-                {"stdout": completed.stdout, "stderr": completed.stderr},
+                {"stdout": result.get("stdout", ""), "stderr": result.get("stderr", "")},
             )
             state = load_json(root / "session.json")
             state["stage"] = "needs_review"
@@ -161,7 +165,7 @@ def _explore_round(directory, action, *, runner):
                 reason="browser_interrupted",
             )
         return load_json(output)
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, TimeoutError):
         state = load_json(root / "session.json")
         state["stage"] = "needs_review"
         save_private(root / "session.json", state)
@@ -174,12 +178,12 @@ def _explore_round(directory, action, *, runner):
         state["stage"] = "needs_review"
         save_private(root / "session.json", state)
         raise CallError(
-            "ego-browser executable or round output unavailable; inspect the local installation",
+            "Browser backend executable or round output unavailable; inspect the local installation",
             reason="browser_unavailable",
         ) from None
 
 
-def source_map(directory, *, max_sources=40, max_bytes=25_000_000, runner=subprocess.run):
+def source_map(directory, *, max_sources=40, max_bytes=25_000_000, runner=None, backend=None):
     """Static API-map: list the app's JS (source_urls round), download it, regex-extract the
     endpoint surface. Writes source_api_map.json to the session. Downloaded JS is untrusted data,
     never executed. Returns the map (endpoints only; raw source is not retained in the result)."""
@@ -187,7 +191,7 @@ def source_map(directory, *, max_sources=40, max_bytes=25_000_000, runner=subpro
     from .api_extract import extract
 
     root = Path(directory).resolve()
-    res = _explore_round(root, {"kind": "source_urls"}, runner=runner)
+    res = _explore_round(root, {"kind": "source_urls"}, runner=runner, backend=backend)
     urls = [
         u for u in (res.get("js_urls") or []) if isinstance(u, str) and u.startswith(("http://", "https://"))
     ]

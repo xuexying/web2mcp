@@ -113,16 +113,20 @@ HAR 导入会从请求/响应头重建 cookie 快照，**登录态随 HAR 一起
 
 ### 方式三：让 AI 驱动浏览器探索（experimental）
 
-需要浏览器后端：[ego-browser](https://github.com/citrolabs/ego-lite)（可选；免费；目前支持 macOS 和 Windows——HAR 路径不需要它）。
+需要浏览器后端，用 `--backend` 选择（默认 auto）：
+
+- `playwright` — 内置 Chromium，跨平台（`pip install 'web2mcp[record]'`）。
+- `ego` — [ego-browser](https://github.com/citrolabs/ego-lite)（可选；免费；macOS 和 Windows）。
+- `cdp` — 连接你用 `--remote-debugging-port=9222` 启动的 Chrome，复用其现有登录态。
 
 ```sh
 python -m web2mcp explore-start work/exploration \
-  --url https://example.com \
+  --url https://example.com --backend playwright \
   --goal '读取任务列表和详情，验证两个不同任务'
 python -m web2mcp serve-explorer work/exploration
 ```
 
-外部 AI 通过受限动作观察页面、执行经审阅的有界 UI 操作、起草候选配置、运行试验并安装工具。登录由你在浏览器里完成，程序不接收密码或验证码。`source-map` / `explore-survey` / `synth-profile` 可以从应用自身发布的 JavaScript 加运行时采集测绘接口面；合成的 profile 默认 `read_only_mode`。
+外部 AI 通过受限动作观察页面、执行经审阅的有界 UI 操作、起草候选配置、运行试验并安装工具。登录由你在浏览器里完成，程序不接收密码或验证码。`source-map` / `explore-survey` / `synth-profile` 可以从应用自身发布的 JavaScript 加运行时采集测绘接口面；合成的 profile 默认 `read_only_mode`。（HAR 路径和 `web2mcp record` 完全不需要后端。）
 
 ### 方式四：自动接入服务（experimental——尚未在真实网站验证）
 
