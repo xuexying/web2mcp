@@ -60,6 +60,15 @@ def _main():
     q.add_argument("capture")
     q.add_argument("--out", help="Profile directory (default: <capture>-profile next to the file)")
     q.add_argument("--origin", action="append", help="Pin the API origin(s); otherwise auto-detected")
+    ac = commands.add_parser(
+        "add-curl",
+        help="Read one 'Copy as cURL' command from stdin and add that operation to a profile",
+    )
+    ac.add_argument("profile")
+    ac.add_argument(
+        "--origin", action="append", help="Limit to these origins (default: inferred from the URL)"
+    )
+    ac.add_argument("--read-only-safe", action="store_true", help="Hide and block writes (read_only_mode)")
     lst = commands.add_parser("list")
     lst.add_argument("profile")
     c = commands.add_parser("call")
@@ -230,6 +239,12 @@ def _main():
         result = record(args.url, args.out, browser_channel=args.channel)
     elif args.command == "quick":
         result = quick(args.capture, args.out, args.origin)
+    elif args.command == "add-curl":
+        from .add_curl import add_curl
+
+        result = add_curl(
+            args.profile, sys.stdin.read(), origins=args.origin, read_only_safe=args.read_only_safe
+        )
     elif args.command == "serve":
         from .server import serve
 

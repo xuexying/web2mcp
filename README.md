@@ -119,6 +119,14 @@ HAR import reconstructs the cookie snapshot from request/response headers, so **
 
 To enable writes: review semantics, then use `trial-read` / `publish-reads`, or the pack flow `draft-pack` → `check-pack` → `trial-pack` → `install-pack`, and install a reviewed write contract. Full walkthrough in [docs/INTEGRATION.md](docs/INTEGRATION.md); pack syntax in [web2mcp/pack_reference.md](web2mcp/pack_reference.md).
 
+**Just one endpoint?** Paste a DevTools "Copy as cURL" (bash) command and add that single operation to a profile — no HAR needed:
+
+```sh
+pbpaste | web2mcp add-curl work/site-profile      # macOS; use your clipboard tool of choice
+```
+
+Repeated `add-curl` calls accumulate into the same profile; the real response shape is filled in later by a `trial-read`.
+
 ### 3. AI-driven browser exploration (experimental)
 
 Needs a browser backend, selected with `--backend` (default: auto):

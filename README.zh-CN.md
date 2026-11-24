@@ -119,6 +119,14 @@ HAR 导入会从请求/响应头重建 cookie 快照，**登录态随 HAR 一起
 
 要开启写入：审查语义后，用 `trial-read` / `publish-reads`，或接入包流程 `draft-pack` → `check-pack` → `trial-pack` → `install-pack`，并安装经过审查的写入契约。完整命令见 [docs/INTEGRATION.md](docs/INTEGRATION.md)，接入包语法见 [web2mcp/pack_reference.md](web2mcp/pack_reference.md)。
 
+**只想接一个接口？** 把开发者工具里的 "Copy as cURL"（bash）命令粘进来，就能把这一个操作加进 profile，不需要 HAR：
+
+```sh
+pbpaste | web2mcp add-curl work/site-profile      # macOS；换成你习惯的剪贴板工具即可
+```
+
+多次 `add-curl` 会累积进同一个 profile；真实响应结构之后用 `trial-read` 补上。
+
 ### 方式三：让 AI 驱动浏览器探索（experimental）
 
 需要浏览器后端，用 `--backend` 选择（默认 auto）：
