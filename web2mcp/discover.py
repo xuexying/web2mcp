@@ -696,3 +696,36 @@ def discover(capture_path, destination, origins, policy=None, *, read_only_safe=
         "read_only": sum(o["read_only"] for o in operations),
         "auth_adapters": sorted(set(v["type"] for v in credentials["auth"].values())),
     }
+
+
+def quick(capture_path, out=None, origins=None):
+    """One command from a capture/HAR to a safe read-only MCP profile. Inspects the capture,
+    picks the API origin automatically when there is a single clear candidate (and stops,
+    listing them, when there are several), runs a read-only-safe discover, and returns a
+    paste-ready MCP config. Nothing is sent; writes stay hidden and blocked (read_only_mode)."""
+    from .client import CallError
+
+    summary = summarize_capture(capture_path)
+    suggested = summary["suggested_origins"]
+    chosen = list(origins) if origins else suggested
+    if not chosen:
+        raise CallError(
+            f"No clear API origin found. Run `web2mcp inspect {capture_path}` to see every "
+            "origin, then pass --origin."
+        )
+    if not origins and len(suggested) > 1:
+        raise CallError("Several candidate origins; pass one or more with --origin: " + ", ".join(suggested))
+    if out is None:
+        src = Path(capture_path)
+        out = src.with_name(src.stem + "-profile")
+    result = discover(capture_path, out, chosen, read_only_safe=True)
+    mcp_config = load_json(Path(out) / "mcp.json")
+    return {
+        "profile": result["profile"],
+        "origins": chosen,
+        "operations": result["operations"],
+        "read_only": result["read_only"],
+        "mcp_config": mcp_config,
+        "next": f"Paste mcp_config into your MCP client, or run `web2mcp serve {result['profile']}`. "
+        "Writes are hidden and blocked (read_only_mode); review and re-enable them deliberately.",
+    }

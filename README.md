@@ -93,7 +93,13 @@ web2mcp serve work/site-profile
 
 Works on any OS with any browser and no extra tooling at all. Only use captures of sites and accounts you are authorized to automate.
 
-Not sure which `--origin` to pass? `inspect` shows per-origin operation counts, read/write split and login presence, and prints a ready-to-paste `discover` command (third-party/analytics hosts are flagged and excluded):
+**Fastest path — `web2mcp quick`:** inspect, auto-pick the API origin, build a read-only-safe profile and print a paste-ready MCP config, in one command. It proceeds automatically when there's a single clear API origin, and stops to let you choose with `--origin` when there are several:
+
+```sh
+web2mcp quick work/site.har
+```
+
+Prefer the explicit steps? Not sure which `--origin` to pass? `inspect` shows per-origin operation counts, read/write split and login presence, and prints a ready-to-paste `discover` command (third-party/analytics hosts are flagged and excluded):
 
 ```sh
 web2mcp inspect work/site.har

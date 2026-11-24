@@ -3,7 +3,7 @@ import json
 import sys
 from . import __version__
 from .client import CallError, Client
-from .discover import discover, summarize_capture
+from .discover import discover, quick, summarize_capture
 from .storage import load_json, save_private
 
 
@@ -53,6 +53,13 @@ def _main():
     r.add_argument("url")
     r.add_argument("--out", required=True, help="Private directory for capture.json and browser profile")
     r.add_argument("--channel", help="Use an installed browser channel (e.g. chrome, msedge)")
+    q = commands.add_parser(
+        "quick",
+        help="One command: capture/HAR -> auto-pick origin -> safe read-only MCP profile + paste-ready config",
+    )
+    q.add_argument("capture")
+    q.add_argument("--out", help="Profile directory (default: <capture>-profile next to the file)")
+    q.add_argument("--origin", action="append", help="Pin the API origin(s); otherwise auto-detected")
     lst = commands.add_parser("list")
     lst.add_argument("profile")
     c = commands.add_parser("call")
@@ -221,6 +228,8 @@ def _main():
         from .record import record
 
         result = record(args.url, args.out, browser_channel=args.channel)
+    elif args.command == "quick":
+        result = quick(args.capture, args.out, args.origin)
     elif args.command == "serve":
         from .server import serve
 

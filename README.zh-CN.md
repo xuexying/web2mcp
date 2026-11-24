@@ -93,7 +93,13 @@ web2mcp serve work/site-profile
 
 任意操作系统、任意浏览器，完全不依赖额外工具。仅使用你有权限操作的站点和账号。
 
-不确定该填哪个 `--origin`？`inspect` 会列出每个来源的接口数、读写分布、是否带登录，并给出可直接粘贴的 `discover` 命令（第三方/分析域会被标记并排除）：
+**最快路径 —— `web2mcp quick`：** 一条命令完成 inspect、自动选 API origin、产出安全只读 profile 并打印可直接粘贴的 MCP 配置。只有一个明确的 API origin 时自动进行；有多个候选时停下来让你用 `--origin` 选：
+
+```sh
+web2mcp quick work/site.har
+```
+
+想一步步来？不确定该填哪个 `--origin`？`inspect` 会列出每个来源的接口数、读写分布、是否带登录，并给出可直接粘贴的 `discover` 命令（第三方/分析域会被标记并排除）：
 
 ```sh
 web2mcp inspect work/site.har
