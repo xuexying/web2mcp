@@ -69,11 +69,29 @@ python -m pytest -q
 
 演示会启动仅监听 `127.0.0.1` 的虚构采购系统，生成请求样本，创建临时 profile，再通过真正的 MCP stdio 连接完成读取、预览、一次批准、回读及重复提交拦截。数据全部虚构，不使用真实 AI 或浏览器。
 
-## 三种接入方式
+## 接入方式
 
-### 方式一：导入 HAR（stable，推荐）
+### 方式一：一条命令录制（`web2mcp record`）
 
-任意操作系统、任意浏览器，不依赖额外工具。仅使用你有权限操作的站点和账号。
+从网址到只读 MCP 的最短路径，macOS / Linux / Windows 都能用。需要可选的录制组件：
+
+```sh
+pip install 'web2mcp[record]'
+playwright install chromium
+web2mcp record https://app.example.com --out work/site
+```
+
+会弹出一个 Chromium 窗口；登录并点开你关心的页面，然后**关闭窗口**即结束。录到的流量变成 `work/site/capture.json`，`record` 会打印每来源概览和可直接粘贴的 `discover` 命令。密码和验证码由你在窗口里手动输入——任何含密码类字段的请求在落盘前就被丢弃，原始录制文件转换后即删除。然后：
+
+```sh
+web2mcp discover work/site/capture.json \
+  --out work/site-profile --origin https://api.example.com --read-only-safe
+web2mcp serve work/site-profile
+```
+
+### 方式二：导入 HAR（stable）
+
+任意操作系统、任意浏览器，完全不依赖额外工具。仅使用你有权限操作的站点和账号。
 
 不确定该填哪个 `--origin`？`inspect` 会列出每个来源的接口数、读写分布、是否带登录，并给出可直接粘贴的 `discover` 命令（第三方/分析域会被标记并排除）：
 
@@ -93,7 +111,7 @@ HAR 导入会从请求/响应头重建 cookie 快照，**登录态随 HAR 一起
 
 要开启写入：审查语义后，用 `trial-read` / `publish-reads`，或接入包流程 `draft-pack` → `check-pack` → `trial-pack` → `install-pack`，并安装经过审查的写入契约。完整命令见 [docs/INTEGRATION.md](docs/INTEGRATION.md)，接入包语法见 [web2mcp/pack_reference.md](web2mcp/pack_reference.md)。
 
-### 方式二：让 AI 驱动浏览器探索（experimental）
+### 方式三：让 AI 驱动浏览器探索（experimental）
 
 需要浏览器后端：[ego-browser](https://github.com/citrolabs/ego-lite)（可选；免费；目前支持 macOS 和 Windows——HAR 路径不需要它）。
 
@@ -106,7 +124,7 @@ python -m web2mcp serve-explorer work/exploration
 
 外部 AI 通过受限动作观察页面、执行经审阅的有界 UI 操作、起草候选配置、运行试验并安装工具。登录由你在浏览器里完成，程序不接收密码或验证码。`source-map` / `explore-survey` / `synth-profile` 可以从应用自身发布的 JavaScript 加运行时采集测绘接口面；合成的 profile 默认 `read_only_mode`。
 
-### 方式三：自动接入服务（experimental——尚未在真实网站验证）
+### 方式四：自动接入服务（experimental——尚未在真实网站验证）
 
 本地 HTTP API 接收网址和目标；可配置模型规划探索、试验、提问和发布。循环和安全门禁有模拟模型的测试覆盖，但**还没有真实模型在真实网站上端到端跑通过**——见 [ROADMAP.zh-CN.md](ROADMAP.zh-CN.md)。
 

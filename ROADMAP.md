@@ -36,8 +36,10 @@ The priorities below aim at that goal.
 ## P0 — make it usable by third parties (biggest blocker)
 
 - **P0-1 Remove the hard `ego-browser` dependency; make the capture backend pluggable.**
-  Add a publicly installable backend (Playwright / headless Chrome); ego-browser becomes one
-  option. Done when: a stranger with only Python + Playwright completes a full capture.
+  ✅ Partly done: `web2mcp record <url>` opens a Chromium window via Playwright
+  (`pip install 'web2mcp[record]'`) and produces a capture with no ego-browser — so a
+  stranger with only Python + Playwright completes a full capture on any OS. Remaining:
+  a pluggable backend for the AI-driven *exploration* flow (not just one-shot record).
 - **P0-2 Promote HAR import to the first-class path.** HAR is the only browser-independent
   entrance; document "export HAR from DevTools → discover" as the primary flow.
   Done when: a user with no browser tooling gets an MCP server from a single HAR file.

@@ -170,7 +170,7 @@ def normalize_capture(value):
                     "method": req["method"],
                     "url": req["url"],
                     "headers": req_headers,
-                    "postData": req.get("postData", {}).get("text"),
+                    "postData": (req.get("postData") or {}).get("text"),
                 },
                 "response": {"status": res["status"], "mimeType": content.get("mimeType", ""), "body": body},
                 "label": entry.get("comment", "Imported HAR"),

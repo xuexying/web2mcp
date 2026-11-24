@@ -36,6 +36,7 @@ Homepage = "https://github.com/xuexying/web2mcp"
 Issues = "https://github.com/xuexying/web2mcp/issues"
 
 [project.optional-dependencies]
+record = ["playwright>=1.49,<2"]
 test = ["pytest>=8,<9"]
 dev = ["pytest>=8,<9", "ruff>=0.8"]
 

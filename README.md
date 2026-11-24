@@ -69,11 +69,29 @@ python -m pytest -q
 
 The demo spins up a fictional loopback-only purchase system, captures samples, builds a profile, then — over a real MCP stdio connection — reads a record, previews an approval, approves once, verifies the result by reading it back, and blocks the duplicate submission. All data is synthetic; no real AI or browser is involved.
 
-## Three ways in
+## Ways in
 
-### 1. Import a HAR (stable)
+### 1. Record in one command (`web2mcp record`)
 
-Works on any OS with any browser and no extra tooling. Only use captures of sites and accounts you are authorized to automate.
+The shortest path from a URL to a read-only MCP server, on macOS, Linux and Windows. Needs the optional recorder:
+
+```sh
+pip install 'web2mcp[record]'
+playwright install chromium
+web2mcp record https://app.example.com --out work/site
+```
+
+A Chromium window opens; log in and click through the parts you care about, then **close the window** to finish. The recorded traffic becomes `work/site/capture.json`, and `record` prints the per-origin summary and a ready-to-paste `discover` command. You type passwords and verification codes yourself in the window — any request carrying a password-like field is dropped before anything is written, and the raw recording is deleted after conversion. Then:
+
+```sh
+web2mcp discover work/site/capture.json \
+  --out work/site-profile --origin https://api.example.com --read-only-safe
+web2mcp serve work/site-profile
+```
+
+### 2. Import a HAR (stable)
+
+Works on any OS with any browser and no extra tooling at all. Only use captures of sites and accounts you are authorized to automate.
 
 Not sure which `--origin` to pass? `inspect` shows per-origin operation counts, read/write split and login presence, and prints a ready-to-paste `discover` command (third-party/analytics hosts are flagged and excluded):
 
@@ -93,7 +111,7 @@ HAR import reconstructs the cookie snapshot from request/response headers, so **
 
 To enable writes: review semantics, then use `trial-read` / `publish-reads`, or the pack flow `draft-pack` → `check-pack` → `trial-pack` → `install-pack`, and install a reviewed write contract. Full walkthrough in [docs/INTEGRATION.md](docs/INTEGRATION.md); pack syntax in [web2mcp/pack_reference.md](web2mcp/pack_reference.md).
 
-### 2. AI-driven browser exploration (experimental)
+### 3. AI-driven browser exploration (experimental)
 
 Requires a browser backend: [ego-browser](https://github.com/citrolabs/ego-lite) (optional; free; currently macOS and Windows — the HAR path does not need it).
 
@@ -106,7 +124,7 @@ python -m web2mcp serve-explorer work/exploration
 
 A connected AI observes pages, drives bounded reviewed UI actions, drafts candidate configs, runs trials and installs tools. You complete logins yourself in the browser — the program never receives passwords or verification codes. `source-map` / `explore-survey` / `synth-profile` can map an app's API surface from its shipped JavaScript plus runtime capture; synthesized profiles default to `read_only_mode`.
 
-### 3. Autopilot integration service (experimental — not yet validated on a real site)
+### 4. Autopilot integration service (experimental — not yet validated on a real site)
 
 A local HTTP API accepts a URL and a goal; a configurable model plans exploration, trials, questions and publishing. The loop and its safety gates are covered by tests with a simulated model, but **no real model has yet driven a real site end to end** — see [ROADMAP.md](ROADMAP.md).
 

@@ -45,6 +45,14 @@ def _main():
         "inspect", help="Offline overview of a capture/HAR: per-origin ops and a suggested discover command"
     )
     ins.add_argument("capture")
+    r = commands.add_parser(
+        "record",
+        help="Open a Chromium window; log in and click around, close it to produce capture.json "
+        "(needs: pip install 'web2mcp[record]')",
+    )
+    r.add_argument("url")
+    r.add_argument("--out", required=True, help="Private directory for capture.json and browser profile")
+    r.add_argument("--channel", help="Use an installed browser channel (e.g. chrome, msedge)")
     lst = commands.add_parser("list")
     lst.add_argument("profile")
     c = commands.add_parser("call")
@@ -203,6 +211,10 @@ def _main():
         )
     elif args.command == "inspect":
         result = summarize_capture(args.capture)
+    elif args.command == "record":
+        from .record import record
+
+        result = record(args.url, args.out, browser_channel=args.channel)
     elif args.command == "serve":
         from .server import serve
 
