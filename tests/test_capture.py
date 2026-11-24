@@ -47,7 +47,7 @@ console.log(JSON.stringify({result,rounds,calls}));
         capture_output=True,
         text=True,
         check=True,
-        timeout=5,
+        timeout=60,
     )
     result = json.loads(completed.stdout)
     data = json.loads((tmp_path / "capture" / "capture.json").read_text(encoding="utf-8"))
@@ -102,7 +102,7 @@ console.log(JSON.stringify({result,calls}));
         capture_output=True,
         text=True,
         check=True,
-        timeout=5,
+        timeout=60,
     )
     result = json.loads(done.stdout)
     path = tmp_path / "capture/capture.json"

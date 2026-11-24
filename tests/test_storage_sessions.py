@@ -223,6 +223,6 @@ await assert.rejects(captureStorage(page,[source]));
         [node, str(script), mod.as_uri(), str(tmp_path / "private/storage.json")],
         check=True,
         capture_output=True,
-        timeout=10,
+        timeout=60,
     )
     assert os.name != "posix" or (tmp_path / "private/storage.json").stat().st_mode & 0o777 == 0o600

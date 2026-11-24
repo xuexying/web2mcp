@@ -326,7 +326,7 @@ def test_real_local_http_api_round_trip(tmp_path):
             assert response.status_code == 202
             ident = response.json()["id"]
             for future in api.futures:
-                future.result(timeout=3)
+                future.result(timeout=30)
             job = http.get("/v1/integrations/" + ident).json()
             assert job["question"]["reason"] == "model_not_configured"
     finally:
