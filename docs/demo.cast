@@ -1,0 +1,11 @@
+{"version": 2, "width": 80, "height": 24, "timestamp": 1795555663, "env": {"SHELL": "/bin/zsh", "TERM": "xterm-256color"}}
+[0.275246, "o", "  → started a fictional purchase system on 127.0.0.1 (loopback only)\r\n"]
+[0.29543, "o", "  → captured 6 real HTTP requests from the demo site\r\n"]
+[0.297357, "o", "  → discovered 3 operations (2 read, 1 write) -> profile with MCP server, Python client and openapi.json\r\n"]
+[0.309742, "o", "  → installed reviewed write contract: purchase_approve (prepare -> submit -> read back)\r\n"]
+[0.511472, "o", "  → connected over real MCP stdio transport\r\n"]
+[0.519281, "o", "  → read record 102: status is 'pending'\r\n"]
+[0.531014, "o", "  → previewed the approval - nothing was sent, record is still 'pending'\r\n"]
+[0.542087, "o", "  → submitted the approved write; server-side business result verified\r\n"]
+[0.550331, "o", "  → read back: status is now 'approved'; duplicate submission was blocked\r\n"]
+[0.588097, "o", "{\r\n  \"transport\": \"MCP stdio\",\r\n  \"record_id\": \"102\",\r\n  \"preview_wrote\": false,\r\n  \"before\": \"pending\",\r\n  \"after\": \"approved\",\r\n  \"readback_verified\": true,\r\n  \"duplicate_blocked\": true\r\n}\r\n"]

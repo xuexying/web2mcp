@@ -1,0 +1,20 @@
+{
+  "POST /rpc": {
+    "variants": [
+      {
+        "match": {
+          "/method": "task.get"
+        },
+        "name": "detail",
+        "read_only": true
+      },
+      {
+        "match": {
+          "/method": "task.decide"
+        },
+        "name": "decide",
+        "read_only": false
+      }
+    ]
+  }
+}

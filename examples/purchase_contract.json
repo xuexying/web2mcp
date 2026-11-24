@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "name": "purchase_approve",
+  "description": "Approve fixture purchase",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1
+      },
+      "budget_code": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required": [
+      "id",
+      "note",
+      "budget_code"
+    ],
+    "additionalProperties": false
+  },
+  "lock_key": {
+    "$arg": "/id"
+  },
+  "preflight": [
+    {
+      "id": "before",
+      "operation": "detail",
+      "arguments": {
+        "path": {
+          "record_id": {
+            "$arg": "/id"
+          }
+        }
+      },
+      "pin": [
+        "/data/id",
+        "/data/version",
+        "/data/status",
+        "/data/kind"
+      ],
+      "assertions": [
+        {
+          "pointer": "/data/id",
+          "value": {
+            "$arg": "/id"
+          }
+        },
+        {
+          "pointer": "/data/kind",
+          "value": "purchase"
+        },
+        {
+          "pointer": "/data/status",
+          "value": "pending"
+        }
+      ]
+    }
+  ],
+  "write": {
+    "operation": "decide",
+    "allowed_body_fields": [
+      "version",
+      "decision",
+      "note",
+      "budget_code"
+    ],
+    "arguments": {
+      "path": {
+        "record_id": {
+          "$arg": "/id"
+        }
+      },
+      "body": {
+        "version": {
+          "$step": "before",
+          "pointer": "/data/version"
+        },
+        "decision": "approved",
+        "note": {
+          "$arg": "/note"
+        },
+        "budget_code": {
+          "$arg": "/budget_code"
+        }
+      }
+    }
+  },
+  "verify": [
+    {
+      "id": "after",
+      "operation": "detail",
+      "arguments": {
+        "path": {
+          "record_id": {
+            "$arg": "/id"
+          }
+        }
+      },
+      "assertions": [
+        {
+          "pointer": "/data/id",
+          "value": {
+            "$arg": "/id"
+          }
+        },
+        {
+          "pointer": "/data/status",
+          "value": "approved"
+        },
+        {
+          "pointer": "/data/version",
+          "op": "gt",
+          "value": {
+            "$step": "before",
+            "pointer": "/data/version"
+          }
+        },
+        {
+          "pointer": "/data/note",
+          "value": {
+            "$arg": "/note"
+          }
+        },
+        {
+          "pointer": "/data/budget_code",
+          "value": {
+            "$arg": "/budget_code"
+          }
+        }
+      ]
+    }
+  ]
+}

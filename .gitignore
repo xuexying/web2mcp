@@ -1,0 +1,44 @@
+# Local environments and build products
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.DS_Store
+.coverage
+htmlcov/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+model.local.json
+*.local.json
+credentials.json
+*credentials*.json
+*token*.json
+*session*.json
+*.private.*
+*.pem
+*.key
+
+# Captures, generated profiles, business payloads and execution history
+*.har
+capture.json
+*-capture.json
+storage.json
+work/
+profiles/
+captures/
+private/
+jobs/
+rounds/
+diagnostics/
+audit/
+submissions/
+previews/
+locks/
+*.log

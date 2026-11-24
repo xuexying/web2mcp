@@ -1,0 +1,15 @@
+{
+  "GET /forms/load": {
+    "name": "detail",
+    "read_only": true
+  },
+  "POST /forms/save": {
+    "name": "decide",
+    "read_only": false,
+    "csrf": {
+      "cookie": "XSRF-TOKEN",
+      "header": "X-XSRF-TOKEN",
+      "url_decode": true
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "endpoint": "",
+  "model": "",
+  "auth": "bearer",
+  "api_key_env": "WEB2MCP_MODEL_API_KEY",
+  "json_mode": true,
+  "token_limit_field": "max_completion_tokens",
+  "max_output_tokens": 12000
+}
