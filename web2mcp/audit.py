@@ -24,16 +24,22 @@ class Audit:
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         path = self.root / "fingerprint.key"
         with file_lock(path):
-            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
-            with os.fdopen(fd, "r+b") as out:
-                self.key = out.read()
-                if not self.key:
-                    self.key = secrets.token_bytes(32)
+            try:
+                self.key = path.read_bytes()
+            except FileNotFoundError:
+                self.key = b""
+            if len(self.key) != 32:
+                # Absent, empty, or a torn write (an interrupted or racing create):
+                # (re)generate and persist atomically via a temp file + rename, so no
+                # reader — here or in another process — ever observes a partial key.
+                self.key = secrets.token_bytes(32)
+                tmp = self.root / f".fingerprint.{os.getpid()}.{secrets.token_hex(4)}.tmp"
+                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "wb") as out:
                     out.write(self.key)
                     out.flush()
                     os.fsync(out.fileno())
-                if len(self.key) != 32:
-                    raise ValueError("Invalid audit key")
+                os.replace(tmp, path)
 
     def arguments_hash(self, arguments):
         return hmac.new(self.key, canonical(arguments), hashlib.sha256).hexdigest()

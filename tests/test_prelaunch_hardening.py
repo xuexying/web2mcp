@@ -1,13 +1,38 @@
 """Regression tests for the pre-launch hardening: expanded redaction word list,
-side-effect GET classification, synth read-only defaults, and friendly tool names."""
+side-effect GET classification, synth read-only defaults, friendly tool names, and
+torn/concurrent audit-key initialization."""
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 from test_v2 import ORIGIN, capture, exchange
-from web2mcp.audit import redact
+from web2mcp.audit import Audit, redact
 from web2mcp.discover import discover, op_name
 from web2mcp.explore import auto_publish_reads, synthesize_profile
 from web2mcp.storage import load_json, save_private
+
+
+def test_audit_regenerates_a_torn_key_instead_of_crashing(tmp_path):
+    # A partial (non-32-byte) fingerprint.key — as an interrupted or racing write could
+    # leave — must not raise; it is regenerated to a valid 32-byte key.
+    (tmp_path / "audit").mkdir()
+    (tmp_path / "audit" / "fingerprint.key").write_bytes(b"short")
+    audit = Audit(tmp_path)
+    assert len(audit.key) == 32
+    audit.append(event="ok")
+    assert Audit(tmp_path).verify()["valid"] is True
+
+
+def test_audit_concurrent_init_converges_on_one_key(tmp_path):
+    def make(_):
+        a = Audit(tmp_path)
+        a.append(event="x")
+        return a.key
+
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        keys = list(pool.map(make, range(48)))
+    assert len(set(keys)) == 1
+    assert Audit(tmp_path).verify()["records"] == 48
 
 
 def test_redact_masks_expanded_sensitive_words():
