@@ -45,6 +45,8 @@ flowchart LR
 - **Firefox**：开发者工具 → 网络 → 齿轮 ⚙ → *全部保存为 HAR*。
 - **Safari**：先启用"开发"菜单，然后 开发 → 显示 Web 检查器 → 网络 → *导出*。
 
+**手机 App 和桌面 App**（不只是浏览器）：让 App 走 [mitmproxy](https://mitmproxy.org/) 代理并信任其 CA 证书，然后导出 HAR（`File → Export → HAR`，或用 `mitmweb`/`mitmdump` 加 `--save-har out.har`）。mitmproxy 导出的是标准 HAR 1.2，`web2mcp quick` / `discover` 直接能吃——所以手机 App 或 Electron 桌面 App 和网站是同样的接入方式。只抓你有权自动化的 App 和账号。
+
 HAR 带着你的登录态（Cookie），请把它当作凭据文件保管，不要提交进版本库。
 
 ## 你会得到什么

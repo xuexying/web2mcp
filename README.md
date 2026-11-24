@@ -45,6 +45,8 @@ Log into the target site in any browser, do the few actions you care about, then
 - **Firefox**: DevTools → Network tab → gear icon ⚙ → *Save All As HAR*.
 - **Safari**: enable the Develop menu, then Develop → Show Web Inspector → Network tab → *Export*.
 
+**Phone and desktop apps** (not just browsers): route the app through [mitmproxy](https://mitmproxy.org/) with its CA certificate trusted, then export a HAR (`File → Export → HAR`, or run `mitmweb`/`mitmdump` with `--save-har out.har`). mitmproxy emits standard HAR 1.2, which `web2mcp quick` / `discover` consume directly — so a phone app or an Electron desktop app integrates the same way a website does. Only capture apps and accounts you are authorized to automate.
+
 The HAR carries your login state (cookies), so treat the file as a credential and keep it out of version control.
 
 ## What you get
