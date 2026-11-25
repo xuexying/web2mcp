@@ -127,6 +127,14 @@ pbpaste | web2mcp add-curl work/site-profile      # macOS；换成你习惯的�
 
 多次 `add-curl` 会累积进同一个 profile；真实响应结构之后用 `trial-read` 补上。
 
+**已经有 OpenAPI 文档？** 直接从它生成 profile，不需要采集——web2mcp 的作用变成给你已有的 API 加一层经审查的写入安全层：
+
+```sh
+web2mcp import-openapi api-spec.json --out work/api-profile      # OpenAPI 3.x JSON
+```
+
+默认只读安全（加 `--writes` 同时暴露写操作）。文档里不含凭据，需要你把凭据加进 profile 的私有 `credentials.json`——输出里的 security schemes 会告诉你需要哪种认证——再用 `trial-read` 收紧占位的响应结构。
+
 ### 方式三：让 AI 驱动浏览器探索（experimental）
 
 需要浏览器后端，用 `--backend` 选择（默认 auto）：

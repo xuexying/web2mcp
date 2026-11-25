@@ -69,6 +69,14 @@ def _main():
         "--origin", action="append", help="Limit to these origins (default: inferred from the URL)"
     )
     ac.add_argument("--read-only-safe", action="store_true", help="Hide and block writes (read_only_mode)")
+    io = commands.add_parser(
+        "import-openapi",
+        help="Build a profile from an OpenAPI 3.x JSON document (adds a write-safety layer to an existing API)",
+    )
+    io.add_argument("spec")
+    io.add_argument("--out", required=True, help="Profile directory")
+    io.add_argument("--origin", action="append", help="API origin(s) (default: the spec's servers URL)")
+    io.add_argument("--writes", action="store_true", help="Expose writes too (default: read-only-safe)")
     lst = commands.add_parser("list")
     lst.add_argument("profile")
     c = commands.add_parser("call")
@@ -249,6 +257,10 @@ def _main():
         from .runtime import draft_read_cases
 
         result = draft_read_cases(args.profile, args.capture)
+    elif args.command == "import-openapi":
+        from .import_spec import import_openapi
+
+        result = import_openapi(args.spec, args.out, origins=args.origin, read_only_safe=not args.writes)
     elif args.command == "add-curl":
         from .add_curl import add_curl
 

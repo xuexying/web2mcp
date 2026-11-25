@@ -127,6 +127,14 @@ pbpaste | web2mcp add-curl work/site-profile      # macOS; use your clipboard to
 
 Repeated `add-curl` calls accumulate into the same profile; the real response shape is filled in later by a `trial-read`.
 
+**Already have an OpenAPI spec?** Build a profile straight from it, no capture needed — web2mcp's job becomes adding a reviewed write-safety layer on top of an API you already have:
+
+```sh
+web2mcp import-openapi api-spec.json --out work/api-profile      # OpenAPI 3.x JSON
+```
+
+Reads are exposed read-only-safe by default (add `--writes` to expose writes too). The spec carries no credentials, so add them to the profile's private `credentials.json` — the reported security schemes say what's needed — then `trial-read` tightens the placeholder response shapes.
+
 ### 3. AI-driven browser exploration (experimental)
 
 Needs a browser backend, selected with `--backend` (default: auto):
