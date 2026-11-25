@@ -20,6 +20,13 @@ python -m web2mcp explore-propose work/session
 
 ## 2. 验证读取
 
+不想手搓用例？`draft-read-cases` 会从捕获样本为每个只读操作生成一份用例草稿——参数取自观察到的 URL，断言按观察到的响应结构推断（默认用 `exists`，你再收紧成具体值）：
+
+```sh
+python -m web2mcp draft-read-cases work/site-profile work/site.har
+# 审核 work/site-profile/read-cases/<op>.json，再用它跑 trial-read
+```
+
 `trial-read` 的每个 case 都需要结果断言。有参数的操作需要至少两个不同参数的 case。例如，已观察并命名为 `get_task` 的操作：
 
 ```json

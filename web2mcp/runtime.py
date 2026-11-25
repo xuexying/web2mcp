@@ -282,3 +282,103 @@ class Runtime:
 
 def load_runtime(client):
     return Runtime(client) if (client.root / "runtime.json").exists() else None
+
+
+def _path_matcher(template_path):
+    import re
+
+    parts = []
+    for seg in re.split(r"(\{[^}]+\})", template_path):
+        if seg.startswith("{") and seg.endswith("}"):
+            parts.append(f"(?P<{seg[1:-1]}>[^/]+)")
+        else:
+            parts.append(re.escape(seg))
+    return re.compile("^" + "".join(parts) + "$")
+
+
+def _draft_assertions(body):
+    import re
+
+    checks = []
+    if isinstance(body, dict):
+        if "data" in body:
+            checks.append({"pointer": "/data", "op": "exists", "value": True})
+            inner = body["data"]
+            if isinstance(inner, dict):
+                for key, val in inner.items():
+                    if isinstance(val, (str, int, float, bool)) and re.search(
+                        r"(^|_)id$|name|status|code|title", key, re.I
+                    ):
+                        checks.append({"pointer": f"/data/{key}", "op": "exists", "value": True})
+                        break
+        else:
+            for key, val in body.items():
+                if isinstance(val, (str, int, float, bool)):
+                    checks.append({"pointer": f"/{key}", "op": "exists", "value": True})
+                    break
+    elif isinstance(body, list) and body:
+        checks.append({"pointer": "/0", "op": "exists", "value": True})
+    return checks[:3]
+
+
+def draft_read_cases(profile, capture_path):
+    """Draft trial-read cases for every publishable read op, from the capture samples: real
+    parameters pulled from the observed URLs and 'exists' assertions inferred from the observed
+    response shape. Writes one read-cases/<op>.json per op in the profile, ready to review and
+    pass to `trial-read`. Nothing is sent. A parameterized op with only one observed sample is
+    flagged, since trial-read requires two differing cases."""
+    import json
+    from urllib.parse import parse_qs, urlsplit
+
+    root = Path(profile)
+    manifest = load_json(root / "manifest.json")
+    capture = normalize_capture(load_json(capture_path))
+    exchanges = capture.get("exchanges", [])
+    out_dir = root / "read-cases"
+    drafted = {}
+    for op in manifest["operations"]:
+        if op.get("read_only") is not True or op.get("internal"):
+            continue
+        target = urlsplit(op["url"])
+        matcher = _path_matcher(target.path)
+        parameterized = bool(op.get("path_inference") or op["input_schema"].get("properties"))
+        cases, seen = [], set()
+        for ex in exchanges:
+            req = ex.get("request", {})
+            if (req.get("method") or "").upper() != op["method"]:
+                continue
+            u = urlsplit(req.get("url", ""))
+            if u.netloc != target.netloc or not matcher.match(u.path):
+                continue
+            args = {}
+            groups = matcher.match(u.path).groupdict()
+            if groups:
+                args["path"] = groups
+            query = {k: (v[0] if len(v) == 1 else v) for k, v in parse_qs(u.query).items()}
+            if query and "query" in op["input_schema"].get("properties", {}):
+                args["query"] = query
+            key = fingerprint(args)
+            if key in seen:
+                continue
+            try:
+                body = json.loads(ex.get("response", {}).get("body") or "")
+            except (ValueError, TypeError):
+                continue
+            checks = _draft_assertions(body)
+            if not checks:
+                continue
+            seen.add(key)
+            cases.append({"arguments": args, "assertions": checks})
+        if not cases:
+            continue
+        save_private(out_dir / (op["name"] + ".json"), cases)
+        entry = {"cases": len(cases), "file": str(out_dir / (op["name"] + ".json"))}
+        if parameterized and len(cases) < 2:
+            entry["note"] = "parameterized op: add a second differing case before trial-read"
+        drafted[op["name"]] = entry
+    return {
+        "profile": str(root),
+        "drafted": drafted,
+        "next": "Review each read-cases/<op>.json (tighten 'exists' into exact value checks where "
+        "you can), then: web2mcp trial-read <profile> <op> read-cases/<op>.json --reviewed-read-only",
+    }

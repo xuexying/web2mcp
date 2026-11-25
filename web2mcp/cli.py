@@ -136,6 +136,12 @@ def _main():
     e.add_argument("profile")
     e.add_argument("contract")
     e.add_argument("--reviewed", action="store_true")
+    e = commands.add_parser(
+        "draft-read-cases",
+        help="Draft trial-read cases (parameters + assertions) for each read op from the capture samples",
+    )
+    e.add_argument("profile")
+    e.add_argument("capture")
     e = commands.add_parser("trial-read")
     e.add_argument("profile")
     e.add_argument("operation")
@@ -239,6 +245,10 @@ def _main():
         result = record(args.url, args.out, browser_channel=args.channel)
     elif args.command == "quick":
         result = quick(args.capture, args.out, args.origin)
+    elif args.command == "draft-read-cases":
+        from .runtime import draft_read_cases
+
+        result = draft_read_cases(args.profile, args.capture)
     elif args.command == "add-curl":
         from .add_curl import add_curl
 
