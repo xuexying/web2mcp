@@ -77,6 +77,19 @@ def _main():
     io.add_argument("--out", required=True, help="Profile directory")
     io.add_argument("--origin", action="append", help="API origin(s) (default: the spec's servers URL)")
     io.add_argument("--writes", action="store_true", help="Expose writes too (default: read-only-safe)")
+    ip = commands.add_parser(
+        "import-postman", help="Build a profile from a Postman collection (v2.x JSON export)"
+    )
+    ip.add_argument("collection")
+    ip.add_argument("--out", required=True, help="Profile directory")
+    ip.add_argument("--origin", action="append", help="Limit to these origins (default: inferred)")
+    ip.add_argument(
+        "--var",
+        action="append",
+        default=[],
+        help="Resolve a collection variable, e.g. --var baseUrl=https://api.example.com",
+    )
+    ip.add_argument("--writes", action="store_true", help="Expose writes too (default: read-only-safe)")
     lst = commands.add_parser("list")
     lst.add_argument("profile")
     c = commands.add_parser("call")
@@ -261,6 +274,17 @@ def _main():
         from .import_spec import import_openapi
 
         result = import_openapi(args.spec, args.out, origins=args.origin, read_only_safe=not args.writes)
+    elif args.command == "import-postman":
+        from .import_spec import import_postman
+
+        variables = dict(pair.split("=", 1) for pair in args.var if "=" in pair)
+        result = import_postman(
+            args.collection,
+            args.out,
+            origins=args.origin,
+            variables=variables,
+            read_only_safe=not args.writes,
+        )
     elif args.command == "add-curl":
         from .add_curl import add_curl
 

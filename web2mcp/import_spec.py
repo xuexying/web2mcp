@@ -185,3 +185,133 @@ def import_openapi(spec_path, out, origins=None, read_only_safe=True):
         "credentials.json (the security_schemes above say what's needed), then trial-read reads. "
         "Placeholder response shapes are tightened by trial-read.",
     }
+
+
+# -- Postman collection v2.x --------------------------------------------------
+
+
+def _subst(text, variables):
+    if not isinstance(text, str):
+        return text
+    for key, value in variables.items():
+        text = text.replace("{{" + key + "}}", str(value))
+    return text
+
+
+def _flatten_items(items):
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        if "item" in item:
+            yield from _flatten_items(item["item"])
+        elif "request" in item:
+            yield item
+
+
+def _postman_url(url, variables):
+    if isinstance(url, str):
+        return _subst(url, variables)
+    if isinstance(url, dict):
+        if url.get("raw"):
+            return _subst(url["raw"], variables)
+        host = url.get("host")
+        host = ".".join(host) if isinstance(host, list) else (host or "")
+        path = url.get("path")
+        path = "/".join(str(p) for p in path) if isinstance(path, list) else (path or "")
+        return _subst(f"{url.get('protocol', 'https')}://{host}/{path}", variables)
+    return None
+
+
+def _postman_body(body, headers, variables):
+    if not isinstance(body, dict):
+        return None
+    if body.get("mode") == "raw":
+        raw = _subst(body.get("raw", ""), variables)
+        if raw.strip():
+            headers.setdefault("Content-Type", "application/json")
+            return raw
+    if body.get("mode") == "urlencoded":
+        from urllib.parse import urlencode
+
+        pairs = [
+            (p["key"], _subst(p.get("value", ""), variables))
+            for p in body.get("urlencoded", [])
+            if isinstance(p, dict) and p.get("key") and not p.get("disabled")
+        ]
+        if pairs:
+            headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
+            return urlencode(pairs)
+    return None
+
+
+def _postman_response_body(responses):
+    for r in responses or []:
+        if isinstance(r, dict) and isinstance(r.get("body"), str) and r["body"].strip():
+            try:
+                json.loads(r["body"])
+                return r["body"]  # a real saved example response
+            except ValueError:
+                continue
+    return "{}"
+
+
+def import_postman(collection_path, out, origins=None, variables=None, read_only_safe=True):
+    """Build a profile from a Postman collection (v2.x). Saved example responses are used
+    where present; otherwise a placeholder response is left for trial-read. Nothing is sent."""
+    coll = load_json(collection_path)
+    if not isinstance(coll, dict) or "item" not in coll:
+        raise CallError("Not a Postman collection (no 'item'); export as Collection v2.1.")
+    resolved = {}
+    for v in coll.get("variable", []):
+        if isinstance(v, dict) and v.get("key"):
+            resolved[v["key"]] = v.get("value", "")
+    resolved.update(variables or {})
+    exchanges = []
+    for item in _flatten_items(coll["item"]):
+        req = item["request"]
+        if isinstance(req, str):
+            method, url, headers, body = "GET", _subst(req, resolved), {}, None
+        else:
+            method = (req.get("method") or "GET").upper()
+            url = _postman_url(req.get("url"), resolved)
+            headers = {
+                h["key"]: _subst(h.get("value", ""), resolved)
+                for h in req.get("header", [])
+                if isinstance(h, dict) and h.get("key") and not h.get("disabled")
+            }
+            body = _postman_body(req.get("body"), headers, resolved)
+        if not url or not url.startswith(("http://", "https://")):
+            continue  # unresolved {{variable}} or a non-HTTP request
+        exchanges.append(
+            {
+                "request": {"method": method, "url": url, "headers": headers, "postData": body},
+                "response": {
+                    "status": 200,
+                    "mimeType": "application/json",
+                    "body": _postman_response_body(item.get("response")),
+                },
+                "label": "Postman: " + (item.get("name", "") or "")[:60],
+            }
+        )
+    if not exchanges:
+        raise CallError("No usable HTTP requests in the collection (unresolved {{variables}}? pass --var).")
+    root = Path(out)
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    src = root / "postman-source.json"
+    save_private(src, {"format": "web2mcp-capture-v1", "exchanges": exchanges, "cookies": []})
+    if origins is None:
+        origins = sorted(
+            {
+                f"{urlsplit(e['request']['url']).scheme}://{urlsplit(e['request']['url']).netloc}"
+                for e in exchanges
+            }
+        )
+    result = discover(src, root, origins, read_only_safe=read_only_safe)
+    return {
+        "profile": result["profile"],
+        "operations": result["operations"],
+        "read_only": result["read_only"],
+        "origins": origins,
+        "next": "Add credentials to the profile's private credentials.json, then trial-read. "
+        "Requests with saved example responses already carry a real response shape.",
+    }
