@@ -175,7 +175,15 @@ python -m web2mcp serve-integrations work/integrations \
 
 ## 连接 MCP 或 Python
 
-每个 profile 自带 `mcp.json`；也可以手动配置：
+可以让 `install` 把 profile 写进客户端——默认只预览，加 `--write` 才真写（写前先备份）：
+
+```sh
+web2mcp install work/site-profile --client cursor --write          # 还支持 claude-desktop
+web2mcp install work/site-profile --client claude-code             # 打印 `claude mcp add` 命令
+web2mcp install work/site-profile --client codex                   # 打印 TOML / `codex mcp add`
+```
+
+Claude Code 和 Codex 的配置文件里还存着别的状态，所以对这两个 `install` 会打印要运行的确切命令，而不是直接改文件。也可以手动配置——每个 profile 同样自带 `mcp.json`：
 
 ```json
 {

@@ -175,7 +175,15 @@ The service listens on `127.0.0.1` only and requires a local bearer token (path 
 
 ## Connect from MCP clients or Python
 
-Each profile ships an `mcp.json`; or configure manually:
+Let `install` wire the profile into a client for you — it previews by default and only writes with `--write` (backing up the file first):
+
+```sh
+web2mcp install work/site-profile --client cursor --write          # also: claude-desktop
+web2mcp install work/site-profile --client claude-code             # prints the `claude mcp add` command
+web2mcp install work/site-profile --client codex                   # prints the TOML / `codex mcp add`
+```
+
+Claude Code and Codex keep other state in their config, so for those `install` prints the exact command to run rather than editing the file. Or configure manually — each profile also ships an `mcp.json`:
 
 ```json
 {

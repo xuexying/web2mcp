@@ -90,6 +90,16 @@ def _main():
         help="Resolve a collection variable, e.g. --var baseUrl=https://api.example.com",
     )
     ip.add_argument("--writes", action="store_true", help="Expose writes too (default: read-only-safe)")
+    inst = commands.add_parser(
+        "install",
+        help="Write a profile's MCP server into a client config (preview unless --write)",
+    )
+    inst.add_argument("profile")
+    inst.add_argument("--client", required=True, choices=("claude-desktop", "claude-code", "cursor", "codex"))
+    inst.add_argument("--name", help="Server name (default: profile directory name)")
+    inst.add_argument(
+        "--write", action="store_true", help="Actually write JSON client configs (a backup is made first)"
+    )
     lst = commands.add_parser("list")
     lst.add_argument("profile")
     c = commands.add_parser("call")
@@ -285,6 +295,10 @@ def _main():
             variables=variables,
             read_only_safe=not args.writes,
         )
+    elif args.command == "install":
+        from .install import install as install_client
+
+        result = install_client(args.profile, args.client, name=args.name, write=args.write)
     elif args.command == "add-curl":
         from .add_curl import add_curl
 
